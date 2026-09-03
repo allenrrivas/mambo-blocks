@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mambo-blocks",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/serve.py", "8777"],
+      "port": 8777
+    }
+  ]
+}

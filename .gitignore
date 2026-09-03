@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local Claude Code settings (keep launch.json, it is useful to share)
+.claude/settings.local.json
