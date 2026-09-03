@@ -115,8 +115,7 @@ no expression evaluation anywhere in the pipeline.
 
 ## Status
 
-**Flown.** Take off, flip, hover and land all confirmed on real hardware
-(`Mambo_669772`).
+**Flown.** Take off, flip, hover and land all confirmed on real hardware.
 
 Verified against the drone:
 
