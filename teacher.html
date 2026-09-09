@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mambo Blocks — Teacher</title>
+<link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Teacher console</h1>
+    <span id="status" class="pill off">Not connected</span>
+    <div class="readouts">
+      <div class="readout">battery<span id="battery" class="value">--</span></div>
+      <div class="readout">state<span id="state" class="value">--</span></div>
+    </div>
+    <span id="selected" class="status"></span>
+    <button id="connect" class="ghost">Connect drone</button>
+    <button id="fly" class="go" disabled>Fly this</button>
+    <button id="land" class="ghost" disabled>Land</button>
+    <button id="stop" class="stop">STOP</button>
+  </header>
+
+  <div id="warning">
+    This browser has no Web Bluetooth. Use Chrome or Edge on the laptop —
+    Safari and Firefox cannot talk to the drone.
+  </div>
+
+  <main>
+    <div id="queue"></div>
+    <div id="blockly"></div>
+    <aside id="side">
+      <h2>What it will do</h2>
+      <pre id="steps"></pre>
+      <p class="hint">
+        Pick a submission, read the steps, then <strong>Fly this</strong>.
+        Programs are shown read-only — nothing here can be edited by accident.
+      </p>
+    </aside>
+  </main>
+
+  <div id="log"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/blockly/12.3.1/blockly.min.js"></script>
+<script>
+  if (!navigator.bluetooth) document.getElementById('warning').classList.add('show');
+</script>
+<script type="module" src="./js/teacher.js"></script>
+</body>
+</html>

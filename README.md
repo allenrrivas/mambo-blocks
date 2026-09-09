@@ -1,66 +1,74 @@
 # Mambo Blocks
 
-Block coding for the Parrot Mambo, running entirely in a browser on an iPad.
-No Raspberry Pi, no bridge computer, no Mac, no Xcode. The iPad talks Bluetooth
-straight to the drone.
-
-## How it works
-
-The Mambo is a standard BLE GATT peripheral. This app reimplements Parrot's
-command protocol in JavaScript on top of Web Bluetooth, so a static web page can
-fly it directly.
+Classroom drone programming for the Parrot Mambo. Students build flights on
+iPads in a browser and send them to the teacher's laptop, which holds the only
+Bluetooth link and flies each program in turn.
 
 ```
-  Blockly UI  ──▶  runner.js (interpreter)  ──▶  mambo-ble.js  ──▶  drone
+  iPads (plain Safari, plain HTTP)          Teacher's laptop
+  ┌──────────────────────┐                  ┌───────────────────────────┐
+  │ Blockly workspace    │  POST /api/submit│ tools/serve.py            │
+  │ [ Send to teacher ]  ├─────────────────▶ │ + submission queue        │
+  └──────────────────────┘                  │            ↓              │
+                                            │ teacher.html: review→Fly  │
+                                            │            ↓ Web Bluetooth│
+                                            └────────────┼──────────────┘
+                                                         ▼   drone
 ```
 
-The protocol was ported from [pyparrot](https://github.com/amymcgovern/pyparrot)
-(Amy McGovern, MIT) — specifically `pyparrot/networking/bleConnection.py` — and
-cross-checked against gobot's minidrone driver. Every packet builder in
-`mambo-ble.js` has been verified byte-for-byte against pyparrot's `struct.pack`
-output.
+Nothing leaves the room — no cloud, no accounts, no student data off-site, and
+it works with the internet down.
 
-## Requirements
+## Why this shape
 
-**On the iPad: the [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055)
-browser.** Safari does not support Web Bluetooth and never has — Apple has
-declined to ship it. Bluefy is free and ships its own Bluetooth stack.
+**The drone cannot store a program.** The Mambo has no user-programmable
+memory. Every command streams live over BLE and the laptop must keep sending a
+50 ms heartbeat for the whole flight — close the tab mid-program and the drone
+stops. So the laptop flies the drone from the student's instructions rather
+than uploading anything to it.
 
-**The page must be served over HTTPS.** Web Bluetooth requires a secure context.
-`file://` will not work. GitHub Pages is the easiest free option:
+**Students never hold a Bluetooth connection**, which is what makes the iPad
+side easy. Web Bluetooth was the only reason this needed the third-party Bluefy
+browser and an HTTPS origin. Authoring-only means plain Safari over plain HTTP
+on the local network: nothing to install, no MDM request, no deployment.
 
-```bash
-git init && git add -A && git commit -m "Mambo Blocks"
-```
+**The teacher is the safety gate.** One person reviews each program and decides
+when it flies, which is a far better model than thirty children each holding a
+live link to a spinning-propeller device.
 
-Push to a GitHub repo, then Settings → Pages → deploy from `main` / root. You get
-an `https://<user>.github.io/<repo>/` URL — open that in Bluefy.
+## Running a lesson
 
-## Local development
+On the laptop:
 
 ```bash
 python tools/serve.py
 ```
 
-Then open `http://localhost:8777`. localhost counts as a secure context, so Web
-Bluetooth works from a desktop Chrome/Edge browser for testing without an iPad.
+It prints both URLs — give students the LAN one, open the teacher one yourself:
 
-**Use `tools/serve.py`, not `python -m http.server`.** The built-in server sends
-`Last-Modified`, so browsers heuristically cache the ES modules and you end up
-testing old code while the app still loads and mostly works — which is very hard
-to spot. `serve.py` sends `no-store` and is threaded, so reloads are always
-fresh.
+```
+students -> http://192.168.x.x:8777/
+teacher  -> http://localhost:8777/teacher.html
+```
 
-## Using it
+The teacher console needs **Chrome or Edge**. Safari and Firefox have no Web
+Bluetooth, so they cannot talk to the drone.
 
-1. Put the drone on a flat surface and turn it on. Do not move it — it takes a
-   flat-trim reading on connect.
-2. Tap **Connect drone** and pick `Mambo_xxxxxx` from the list.
-3. Drag blocks, tap **Run**.
-4. **STOP** aborts the program mid-move and lands. **Land** does the same by hand.
+Then: put the drone on a flat surface and turn it on, click **Connect drone**,
+pick a submission, read the *What it will do* panel, and click **Fly this**.
 
-The workspace saves to `localStorage`, so a kid's program survives a reload on
-their own iPad.
+Students put their name in, build a flight, and tap **Send to teacher**.
+Resubmitting replaces their pending entry rather than adding another, so nobody
+can flood the queue. Submissions persist to `submissions.jsonl`, so restarting
+the server mid-lesson is not a disaster.
+
+## Requirements
+
+- **Laptop:** Chrome or Edge, Python 3, Bluetooth LE.
+- **iPads:** any modern browser. Must be able to reach the laptop's IP — some
+  managed school networks use client isolation, which blocks device-to-device
+  traffic and would break this. Test by loading the student URL on one iPad.
+- **Drone:** a Parrot Mambo. The FPV camera is not needed; this uses BLE.
 
 ## Safety notes
 
@@ -69,16 +77,19 @@ their own iPad.
   right behaviour for a fly-away and the wrong behaviour for everything else.
 - The runner polls the abort flag between every block and inside every timed
   move, so a 10-second flight can be cut short.
-- If the program throws for any reason, the runner lands rather than leaving the
+- If a program throws for any reason, the runner lands rather than leaving the
   drone hovering.
+- Background tabs get throttled to ~1 Hz, which starves the heartbeat. The
+  teacher console lands automatically if its page is hidden mid-program — keep
+  it in the foreground while flying.
 - `flip` needs roughly 1.5 m of clear space in every direction.
 - **The multi-flip block needs far more.** `flip N times in a row` deliberately
   skips the settle between flips, so altitude loss compounds with no chance to
   recover. Climb first. Gaps under about a second may also be silently dropped
   by the drone's flight controller, which will not accept a flip while it is
   still recovering from the previous one.
-- Speeds are capped at 100 and turns at ±180° by the block definitions, so a kid
-  cannot type in a number that means something surprising.
+- Speeds are capped at 100 and turns at ±180° by the block definitions, so a
+  student cannot type in a number that means something surprising.
 
 ## Why the heartbeat matters
 
@@ -91,36 +102,63 @@ during moves — the same thing gobot's `StartPcmd()` does. Two reasons:
 - It is how the drone expects to be flown. Blocks set the stick values; the
   heartbeat transmits them.
 
-**Keep the page in the foreground while flying.** Browsers throttle timers in
-background tabs to roughly 1 Hz, which starves the heartbeat. The app watches
-for this and lands automatically if the page is hidden mid-program.
-
 ## Files
 
 | File | What it does |
 |---|---|
-| `index.html` | Page shell, layout, styling |
+| `index.html` / `js/student.js` | Student view — author and submit, no drone code |
+| `teacher.html` / `js/teacher.js` | Teacher console — queue, review, fly |
 | `js/mambo-ble.js` | Web Bluetooth driver — UUIDs, handshake, packet builders |
 | `js/blocks.js` | Block definitions, toolbox, starter program |
 | `js/runner.js` | Walks the block tree and drives the drone |
-| `js/app.js` | Wires workspace, drone and buttons together |
+| `js/workspace.js` | Shared Blockly setup and the plain-English describer |
+| `css/app.css` | Styling for both views |
+| `tools/serve.py` | Classroom server: static files + submission queue API |
+| `tools/ble-doctor.py` | Diagnoses the BLE stack without involving a browser |
+
+## The protocol
+
+Ported from [pyparrot](https://github.com/amymcgovern/pyparrot) (Amy McGovern,
+MIT) — specifically `pyparrot/networking/bleConnection.py` — and cross-checked
+against gobot's minidrone driver. All fields are little-endian:
+
+```
+[dataType u8][seq u8][projectId u8][classId u8][cmdId u16][...params]
+```
+
+Two things that are easy to miss and cost real debugging time:
+
+- **The drone stays silent until asked.** Battery and flying state only start
+  arriving after a `common(0)/Common(4)/AllStates(0)` request, so `connect()`
+  issues one. Without it the readouts stay blank forever.
+- **Telemetry arrives on `fb0e`, not `fb0f`.** Subscribe to both.
+
+`pyparrot` remains the reference for anything unimplemented here — the claw and
+gun accessories, `MaxTilt`, speed settings, the Minicam.
 
 ## Design notes
 
 `runner.js` is an **interpreter, not a code generator**. It walks the Blockly
-tree and calls driver methods directly. Nothing a kid builds is ever `eval`'d,
-the abort flag can be checked between every step, and the running block can be
-highlighted. Numeric inputs only accept literal `math_number` blocks — there is
-no expression evaluation anywhere in the pipeline.
+tree and calls driver methods directly. Nothing a student builds is ever
+`eval`'d, the abort flag can be checked between every step, and the running
+block can be highlighted. Numeric inputs only accept literal `math_number`
+blocks — there is no expression evaluation anywhere in the pipeline.
+
+`tools/serve.py` disables caching deliberately. `python -m http.server` sends
+`Last-Modified`, so browsers heuristically cache the ES modules and you end up
+testing old code while the app still loads and mostly works — which is very
+hard to spot. It is also threaded, because a single-threaded server deadlocks
+behind the browser's keep-alive connections.
 
 ## Status
 
-**Flown.** Take off, flip, hover and land all confirmed on real hardware.
+**Flown.** Take off, flip, hover and land confirmed on real hardware, with the
+connection held stable across repeated runs.
 
 Verified against the drone:
 
 - Connects, exposes all 4 services and all 3 required characteristics
-- Battery and flying state parse correctly (reported 68%, `landed`)
+- Battery and flying state parse correctly
 - 8 of 10 notification channels enable; `fd24`/`fd54` are write-only FTP
   characteristics with no notify bit, which is expected
 
@@ -128,17 +166,26 @@ Verified without the drone:
 
 - All 8 packet types match pyparrot byte-for-byte, including signed values
   (turn -90 deg -> `a6 ff`, throttle -30 -> `e2`)
-- Block interpreter: sequencing, nested `repeat`, correct call order
+- Block interpreter: sequencing, nested `repeat`, multi-flip, correct call order
 - STOP aborts a 5-second move mid-flight, neutralises the sticks, then lands
+- Submission API: submit, queue, per-student replacement, status updates,
+  persistence across restart, and 400s on malformed input
+- Student submit flow and teacher review flow end to end in the browser
 
-Not yet tested: **Bluefy on the iPad.** Everything so far has been Chrome on
-Windows, which is the same Web Bluetooth API but a different implementation.
+Not yet tested: **iPads on the real classroom network.** Everything so far has
+been localhost. Client isolation on managed school wifi is the one assumption
+this design rests on.
 
-## First flight checklist
+## Not built yet
 
-1. Open in Bluefy, tap Connect. If the drone does not appear in the picker, the
-   `namePrefix` filter in `mambo-ble.js` may need adjusting to match your drone's
-   advertised name.
-2. Check the battery readout populates — that proves notification parsing works.
-3. Run take off → hover 2s → land, **outdoors or in a large room**, standing clear.
-4. Test STOP mid-hover before trusting it with kids.
+- **Python mode.** Students would write Python instead of blocks. Only the
+  teacher's laptop needs the runtime, so [Pyodide](https://pyodide.org) (real
+  CPython, ~11.6 MB) is affordable here. Run it in a Web Worker and
+  `terminate()` on STOP — `setInterruptBuffer` needs a `SharedArrayBuffer`,
+  which needs COOP/COEP headers. Naming the API after pyparrot's would let
+  student code transfer to a real Python environment later.
+- **A "Show Python" button** on the block view, so students can see the text
+  equivalent of what they built. Blockly has code generation built in.
+- **C++ mode.** Harder to justify: JSCPP has been dormant since 2021, and
+  clang-in-WASM is ~40 MB and experimental. A purpose-built C-subset
+  interpreter would be the honest path if a curriculum demands it.
