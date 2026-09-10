@@ -123,6 +123,9 @@ function select(id) {
     els.blockly.hidden = false;
     loadProgram(workspace, item.program);
     Blockly.svgResize(workspace);
+    // Students place blocks wherever they like, so a submission can load
+    // off-screen. Centre it rather than making the teacher hunt for it.
+    workspace.scrollCenter();
     els.steps.textContent = describe(workspace).join('\n') || '(empty program)';
     els.sideTitle.textContent = 'What it will do';
   }

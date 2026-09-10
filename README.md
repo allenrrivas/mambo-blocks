@@ -57,6 +57,10 @@ Bluetooth, so they cannot talk to the drone.
 Then: put the drone on a flat surface and turn it on, click **Connect drone**,
 pick a submission, read the *What it will do* panel, and click **Fly this**.
 
+A submission's blocks can be panned, scrolled, wheeled and zoomed, and are
+centred when you select one. The blocks themselves stay locked, so you cannot
+detach one by accident and fly something other than what the student wrote.
+
 Students put their name in, build a flight, and tap **Send to teacher**.
 Resubmitting replaces their pending entry rather than adding another, so nobody
 can flood the queue. Submissions persist to `submissions.jsonl`, so restarting

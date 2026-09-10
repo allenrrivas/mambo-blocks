@@ -20,6 +20,10 @@ export function createWorkspace(divId, { toolbox = true } = {}) {
     toolbox: toolbox ? TOOLBOX : undefined,
     grid: { spacing: 24, length: 3, colour: '#e6e9ef', snap: true },
     zoom: { controls: true, wheel: true, startScale: 1.0, minScale: 0.4, maxScale: 2.0 },
+    // readOnly silently forces every move option off unless they are passed
+    // explicitly, which left the teacher unable to pan, scroll or wheel a
+    // submission at all. The blocks stay locked; the canvas should not.
+    move: { scrollbars: true, wheel: true, drag: true },
     trashcan: toolbox,
     readOnly: !toolbox,
     renderer: 'zelos', // chunky, Scratch-like blocks that suit touch
