@@ -5,6 +5,7 @@
  */
 
 import { createWorkspace, saveProgram, loadProgram, describe, isEmpty } from './workspace.js';
+import { createCodeEditor } from './code-editor.js';
 
 const KEYS = {
   blocks: 'mambo-blocks-workspace',
@@ -30,46 +31,18 @@ const els = {
   sideTitle: document.getElementById('side-title'),
   blockly: document.getElementById('blockly'),
   editor: document.getElementById('editor'),
-  code: document.getElementById('code'),
-  gutter: document.getElementById('gutter'),
   modeBlocks: document.getElementById('mode-blocks'),
   modePython: document.getElementById('mode-python'),
 };
 
 let workspace = null;
+let editor = null;
 let mode = 'blocks';
 
 function setStatus(text, cls = '') {
   els.status.textContent = text;
   els.status.className = `status ${cls}`;
 }
-
-/* ---- python editor ------------------------------------------------------ */
-
-function renderGutter() {
-  const count = els.code.value.split('\n').length;
-  let out = '';
-  for (let i = 1; i <= count; i += 1) out += `${i}\n`;
-  els.gutter.textContent = out;
-  els.gutter.scrollTop = els.code.scrollTop;
-}
-
-els.code.addEventListener('input', () => {
-  localStorage.setItem(KEYS.python, els.code.value);
-  renderGutter();
-  setStatus('');
-});
-els.code.addEventListener('scroll', () => { els.gutter.scrollTop = els.code.scrollTop; });
-
-// Tab should indent, not jump to the next control - this is a code editor.
-els.code.addEventListener('keydown', (e) => {
-  if (e.key !== 'Tab') return;
-  e.preventDefault();
-  const { selectionStart: a, selectionEnd: b, value } = els.code;
-  els.code.value = `${value.slice(0, a)}    ${value.slice(b)}`;
-  els.code.selectionStart = els.code.selectionEnd = a + 4;
-  els.code.dispatchEvent(new Event('input'));
-});
 
 /* ---- mode switching ----------------------------------------------------- */
 
@@ -88,8 +61,7 @@ function setMode(next) {
   localStorage.setItem(KEYS.mode, next);
   setStatus('');
 
-  if (python) renderGutter();
-  else if (workspace) Blockly.svgResize(workspace);
+  if (!python && workspace) Blockly.svgResize(workspace);
 }
 
 els.modeBlocks.addEventListener('click', () => setMode('blocks'));
@@ -113,7 +85,7 @@ els.submit.addEventListener('click', async () => {
     }
     program = saveProgram(workspace);
   } else {
-    program = els.code.value;
+    program = editor.value;
     if (!program.trim()) {
       setStatus('Your program is empty — write some code.', 'warn');
       return;
@@ -135,7 +107,7 @@ els.submit.addEventListener('click', async () => {
     } else if (data.error === 'syntax') {
       // The server compiled it with real CPython, so this is the true parser.
       setStatus(`Line ${data.line}: ${data.message}`, 'bad');
-      focusLine(data.line);
+      editor.selectLine(data.line);
     } else {
       setStatus(`Could not send: ${data.error || res.status}`, 'bad');
     }
@@ -145,15 +117,6 @@ els.submit.addEventListener('click', async () => {
     els.submit.disabled = false;
   }
 });
-
-/** Put the caret on the line the server complained about. */
-function focusLine(lineNo) {
-  if (!lineNo) return;
-  const lines = els.code.value.split('\n');
-  const pos = lines.slice(0, lineNo - 1).reduce((n, l) => n + l.length + 1, 0);
-  els.code.focus();
-  els.code.setSelectionRange(pos, pos + (lines[lineNo - 1] || '').length);
-}
 
 /* ---- startup ------------------------------------------------------------ */
 
@@ -167,7 +130,14 @@ function init() {
     loadProgram(workspace, null);
   }
 
-  els.code.value = localStorage.getItem(KEYS.python) ?? STARTER_PYTHON;
+  editor = createCodeEditor(els.editor, {
+    value: localStorage.getItem(KEYS.python) ?? STARTER_PYTHON,
+    onChange: (code) => {
+      localStorage.setItem(KEYS.python, code);
+      setStatus('');
+    },
+  });
+
   els.name.value = localStorage.getItem(KEYS.name) || '';
 
   els.name.addEventListener('input', () => {
@@ -182,7 +152,6 @@ function init() {
   });
 
   els.steps.textContent = describe(workspace).join('\n') || 'Drag some blocks to build a flight.';
-  renderGutter();
   setMode(localStorage.getItem(KEYS.mode) === 'python' ? 'python' : 'blocks');
 }
 

@@ -7,6 +7,7 @@ import { MamboBLE } from './mambo-ble.js';
 import { Runner } from './runner.js';
 import { PythonRunner } from './python-runner.js';
 import { createWorkspace, loadProgram, describe } from './workspace.js';
+import { highlightBlock } from './code-editor.js';
 
 const POLL_MS = 2000;
 
@@ -114,7 +115,7 @@ function select(id) {
   if (item.mode === 'python') {
     els.blockly.hidden = true;
     els.source.hidden = false;
-    els.source.textContent = item.program;
+    highlightBlock(els.source, item.program);
     els.steps.textContent = 'Python program — read the code before flying it.';
     els.sideTitle.textContent = 'Heads up';
   } else {

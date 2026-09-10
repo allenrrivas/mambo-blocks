@@ -98,6 +98,21 @@ it compiles the student's program with the real CPython parser and returns the
 line and message. They find out immediately instead of when the teacher tries
 to fly it.
 
+### The editor
+
+Code is themed with **One Dark** (highlight.js `atom-one-dark`), in both the
+student editor and the teacher's read-only view.
+
+The editor is a transparent `<textarea>` layered over a highlighted `<pre>`,
+not a JS editor component. Swapping in CodeMirror or Ace would hand text
+input, selection, the caret and the iPad virtual keyboard over to a library on
+the device this project has tested least. Keeping the native textarea means
+editing behaves exactly as the browser intends and only the colours are ours.
+
+Alignment holds because neither layer wraps and both share font, size,
+line-height, padding and tab-size. If you touch that CSS, check the caret still
+sits on the character it is supposed to.
+
 ### The API students see
 
 | Friendly | pyparrot-compatible alias |
@@ -168,6 +183,7 @@ during moves — the same thing gobot's `StartPcmd()` does. Two reasons:
 | `js/runner.js` | Walks the block tree and drives the drone |
 | `js/py-worker.js` | Pyodide in a Web Worker; the Python API students see |
 | `js/python-runner.js` | Main-thread half of Python mode: call proxy and kill switch |
+| `js/code-editor.js` | Syntax-highlighted Python editor and read-only viewer |
 | `js/workspace.js` | Shared Blockly setup and the plain-English describer |
 | `css/app.css` | Styling for both views |
 | `tools/serve.py` | Classroom server: static files + submission queue API |
