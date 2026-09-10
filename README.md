@@ -230,6 +230,7 @@ during moves — the same thing gobot's `StartPcmd()` does. Two reasons:
 | `css/app.css` | Styling for both views |
 | `tools/serve.py` | Classroom server: static files + submission queue API |
 | `tools/ble-doctor.py` | Diagnoses the BLE stack without involving a browser |
+| `tools/make-icons.py` | Regenerates `favicon.ico` and `apple-touch-icon.png` |
 
 ## The protocol
 
@@ -264,6 +265,21 @@ blocks — there is no expression evaluation anywhere in the pipeline.
 testing old code while the app still loads and mostly works — which is very
 hard to spot. It is also threaded, because a single-threaded server deadlocks
 behind the browser's keep-alive connections.
+
+## Icons
+
+`favicon.svg` is the source of truth for the design; `tools/make-icons.py`
+renders the raster versions. Pillow is not a dependency, so the PNG encoder and
+the ICO container are written on top of `zlib`. Run it only when the design
+changes - the outputs are checked in.
+
+The glyph is drawn at 4x and downsampled rather than aliased. The first pass
+used 2-unit arms, which come out 1px wide at 16px and disappear entirely; they
+are 3 units now. Anything you change here should be checked at 16px, not just
+in the SVG.
+
+`apple-touch-icon.png` means students can add the page to an iPad home screen
+and get a real icon.
 
 ## Status
 

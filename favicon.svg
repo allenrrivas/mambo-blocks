@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Mambo Blocks">
+  <!-- Top-down quadcopter. Geometry matches tools/make-icons.py. -->
+  <rect width="32" height="32" rx="7" fill="#2563eb"/>
+  <g stroke="#fff" stroke-width="3" stroke-linecap="round">
+    <path d="M16 16 8.5 8.5M16 16 23.5 8.5M16 16 8.5 23.5M16 16 23.5 23.5"/>
+  </g>
+  <g fill="#fff">
+    <circle cx="8.5" cy="8.5" r="3.9"/>
+    <circle cx="23.5" cy="8.5" r="3.9"/>
+    <circle cx="8.5" cy="23.5" r="3.9"/>
+    <circle cx="23.5" cy="23.5" r="3.9"/>
+    <rect x="11.7" y="11.7" width="8.6" height="8.6" rx="2.2"/>
+  </g>
+</svg>
