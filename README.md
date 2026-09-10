@@ -1,8 +1,8 @@
 # Mambo Blocks
 
 Classroom drone programming for the Parrot Mambo. Students build flights on
-iPads in a browser and send them to the teacher's laptop, which holds the only
-Bluetooth link and flies each program in turn.
+iPads in a browser - with **blocks or Python** - and send them to the teacher's
+laptop, which holds the only Bluetooth link and flies each program in turn.
 
 ```
   iPads (plain Safari, plain HTTP)          Teacher's laptop
@@ -62,6 +62,61 @@ Resubmitting replaces their pending entry rather than adding another, so nobody
 can flood the queue. Submissions persist to `submissions.jsonl`, so restarting
 the server mid-lesson is not a disaster.
 
+## Python mode
+
+Students can switch from blocks to Python and write plain, synchronous code:
+
+```python
+takeoff()
+for i in range(4):
+    fly("forward", 1, 40)
+    turn("right", 90)
+print("square done")
+land()
+```
+
+No `await` anywhere, and no source rewriting. That works because of **JSPI**
+(WebAssembly stack switching, Chrome 137+): each API function blocks via
+`pyodide.ffi.run_sync` while the drone call round-trips, so the code reads as
+ordinary Python. `loadPyodide` needs `enableRunUntilComplete: true` for it.
+
+**It runs in a Web Worker, and STOP terminates that worker.** Students write
+infinite loops. On the main thread a `while True: pass` would peg the tab and
+the STOP button's own click handler would never get to run - nothing
+cooperative can help, because there is no suspension point. Killing the worker
+works regardless of what the code is doing; the drone is then landed from the
+main thread.
+
+The obvious alternative does not work here: Pyodide's `setInterruptBuffer`
+needs a `SharedArrayBuffer`, which needs COOP/COEP headers.
+
+Web Bluetooth does not exist in workers, so every drone call is proxied to the
+main thread by `postMessage`.
+
+**Syntax is checked on submit, by the server.** `tools/serve.py` is Python, so
+it compiles the student's program with the real CPython parser and returns the
+line and message. They find out immediately instead of when the teacher tries
+to fly it.
+
+### The API students see
+
+| Friendly | pyparrot-compatible alias |
+|---|---|
+| `takeoff()` / `land()` | `safe_takeoff()` / `safe_land()` |
+| `hover(2)` / `wait(2)` | `smart_sleep(2)` |
+| `fly("forward", 1, 40)` | `fly_direct(roll=, pitch=, yaw=, vertical_movement=, duration=)` |
+| `turn("right", 90)` | `turn_degrees(90)` |
+| `flip("front")` | `flip("front")` |
+| `emergency()` | `emergency()` |
+
+The aliases are deliberate: code written here transfers to a real Python
+environment with pyparrot later, so the iPad is an on-ramp rather than a
+dialect dead end.
+
+Errors report the student's own line numbers. The API prelude is compiled as a
+separate unit under its own filename - prepended to their code instead, a
+mistake on line 2 gets reported as line 46.
+
 ## Requirements
 
 - **Laptop:** Chrome or Edge, Python 3, Bluetooth LE.
@@ -111,6 +166,8 @@ during moves — the same thing gobot's `StartPcmd()` does. Two reasons:
 | `js/mambo-ble.js` | Web Bluetooth driver — UUIDs, handshake, packet builders |
 | `js/blocks.js` | Block definitions, toolbox, starter program |
 | `js/runner.js` | Walks the block tree and drives the drone |
+| `js/py-worker.js` | Pyodide in a Web Worker; the Python API students see |
+| `js/python-runner.js` | Main-thread half of Python mode: call proxy and kill switch |
 | `js/workspace.js` | Shared Blockly setup and the plain-English describer |
 | `css/app.css` | Styling for both views |
 | `tools/serve.py` | Classroom server: static files + submission queue API |
@@ -167,6 +224,11 @@ Verified without the drone:
 - All 8 packet types match pyparrot byte-for-byte, including signed values
   (turn -90 deg -> `a6 ff`, throttle -30 -> `e2`)
 - Block interpreter: sequencing, nested `repeat`, multi-flip, correct call order
+- Python mode: plain sync Python drives the drone in the right order; `print()`
+  captured; errors report the student's own line numbers (bad argument,
+  NameError and SyntaxError all checked); `while True: pass` killed by STOP
+  with the drone landed; the worker recovers for the next program
+- Server-side syntax validation, including bad indentation and non-text input
 - STOP aborts a 5-second move mid-flight, neutralises the sticks, then lands
 - Submission API: submit, queue, per-student replacement, status updates,
   persistence across restart, and 400s on malformed input
@@ -178,12 +240,6 @@ this design rests on.
 
 ## Not built yet
 
-- **Python mode.** Students would write Python instead of blocks. Only the
-  teacher's laptop needs the runtime, so [Pyodide](https://pyodide.org) (real
-  CPython, ~11.6 MB) is affordable here. Run it in a Web Worker and
-  `terminate()` on STOP — `setInterruptBuffer` needs a `SharedArrayBuffer`,
-  which needs COOP/COEP headers. Naming the API after pyparrot's would let
-  student code transfer to a real Python environment later.
 - **A "Show Python" button** on the block view, so students can see the text
   equivalent of what they built. Blockly has code generation built in.
 - **C++ mode.** Harder to justify: JSCPP has been dormant since 2021, and

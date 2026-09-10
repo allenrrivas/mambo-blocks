@@ -6,53 +6,96 @@
 
 import { createWorkspace, saveProgram, loadProgram, describe, isEmpty } from './workspace.js';
 
-const STORAGE_KEY = 'mambo-blocks-workspace';
-const NAME_KEY = 'mambo-blocks-name';
+const KEYS = {
+  blocks: 'mambo-blocks-workspace',
+  python: 'mambo-blocks-python',
+  name: 'mambo-blocks-name',
+  mode: 'mambo-blocks-mode',
+};
+
+const STARTER_PYTHON = `# Fly the drone with Python.
+# Look at "Things you can say" for everything you can do.
+
+takeoff()
+hover(2)
+land()
+`;
 
 const els = {
   name: document.getElementById('name'),
   submit: document.getElementById('submit'),
   status: document.getElementById('status'),
   steps: document.getElementById('steps'),
+  help: document.getElementById('help'),
+  sideTitle: document.getElementById('side-title'),
+  blockly: document.getElementById('blockly'),
+  editor: document.getElementById('editor'),
+  code: document.getElementById('code'),
+  gutter: document.getElementById('gutter'),
+  modeBlocks: document.getElementById('mode-blocks'),
+  modePython: document.getElementById('mode-python'),
 };
 
 let workspace = null;
+let mode = 'blocks';
 
 function setStatus(text, cls = '') {
   els.status.textContent = text;
   els.status.className = `status ${cls}`;
 }
 
-function refreshSteps() {
-  const lines = describe(workspace);
-  els.steps.textContent = lines.length
-    ? lines.join('\n')
-    : 'Drag some blocks to build a flight.';
+/* ---- python editor ------------------------------------------------------ */
+
+function renderGutter() {
+  const count = els.code.value.split('\n').length;
+  let out = '';
+  for (let i = 1; i <= count; i += 1) out += `${i}\n`;
+  els.gutter.textContent = out;
+  els.gutter.scrollTop = els.code.scrollTop;
 }
 
-function init() {
-  workspace = createWorkspace('blockly');
+els.code.addEventListener('input', () => {
+  localStorage.setItem(KEYS.python, els.code.value);
+  renderGutter();
+  setStatus('');
+});
+els.code.addEventListener('scroll', () => { els.gutter.scrollTop = els.code.scrollTop; });
 
-  const saved = localStorage.getItem(STORAGE_KEY);
-  try {
-    loadProgram(workspace, saved ? JSON.parse(saved) : null);
-  } catch (err) {
-    loadProgram(workspace, null);
-  }
+// Tab should indent, not jump to the next control - this is a code editor.
+els.code.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const { selectionStart: a, selectionEnd: b, value } = els.code;
+  els.code.value = `${value.slice(0, a)}    ${value.slice(b)}`;
+  els.code.selectionStart = els.code.selectionEnd = a + 4;
+  els.code.dispatchEvent(new Event('input'));
+});
 
-  els.name.value = localStorage.getItem(NAME_KEY) || '';
-  els.name.addEventListener('input', () => {
-    localStorage.setItem(NAME_KEY, els.name.value);
-  });
+/* ---- mode switching ----------------------------------------------------- */
 
-  workspace.addChangeListener(() => {
-    if (workspace.isDragging()) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(saveProgram(workspace)));
-    refreshSteps();
-  });
+function setMode(next) {
+  mode = next;
+  const python = next === 'python';
 
-  refreshSteps();
+  els.blockly.hidden = python;
+  els.editor.hidden = !python;
+  els.steps.hidden = python;
+  els.help.hidden = !python;
+  els.sideTitle.textContent = python ? 'Your program' : 'What it will do';
+  els.modeBlocks.classList.toggle('active', !python);
+  els.modePython.classList.toggle('active', python);
+
+  localStorage.setItem(KEYS.mode, next);
+  setStatus('');
+
+  if (python) renderGutter();
+  else if (workspace) Blockly.svgResize(workspace);
 }
+
+els.modeBlocks.addEventListener('click', () => setMode('blocks'));
+els.modePython.addEventListener('click', () => setMode('python'));
+
+/* ---- submitting --------------------------------------------------------- */
 
 els.submit.addEventListener('click', async () => {
   const name = els.name.value.trim();
@@ -61,9 +104,20 @@ els.submit.addEventListener('click', async () => {
     els.name.focus();
     return;
   }
-  if (isEmpty(workspace)) {
-    setStatus('Your program is empty — drag some blocks in.', 'warn');
-    return;
+
+  let program;
+  if (mode === 'blocks') {
+    if (isEmpty(workspace)) {
+      setStatus('Your program is empty — drag some blocks in.', 'warn');
+      return;
+    }
+    program = saveProgram(workspace);
+  } else {
+    program = els.code.value;
+    if (!program.trim()) {
+      setStatus('Your program is empty — write some code.', 'warn');
+      return;
+    }
   }
 
   els.submit.disabled = true;
@@ -72,10 +126,19 @@ els.submit.addEventListener('click', async () => {
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mode: 'blocks', program: saveProgram(workspace) }),
+      body: JSON.stringify({ name, mode, program }),
     });
-    if (!res.ok) throw new Error(`server said ${res.status}`);
-    setStatus('Sent! Your teacher will fly it. Change it and send again any time.', 'ok');
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      setStatus('Sent! Your teacher will fly it. Change it and send again any time.', 'ok');
+    } else if (data.error === 'syntax') {
+      // The server compiled it with real CPython, so this is the true parser.
+      setStatus(`Line ${data.line}: ${data.message}`, 'bad');
+      focusLine(data.line);
+    } else {
+      setStatus(`Could not send: ${data.error || res.status}`, 'bad');
+    }
   } catch (err) {
     setStatus(`Could not send: ${err.message}. Ask your teacher to check the wifi.`, 'bad');
   } finally {
@@ -83,8 +146,48 @@ els.submit.addEventListener('click', async () => {
   }
 });
 
+/** Put the caret on the line the server complained about. */
+function focusLine(lineNo) {
+  if (!lineNo) return;
+  const lines = els.code.value.split('\n');
+  const pos = lines.slice(0, lineNo - 1).reduce((n, l) => n + l.length + 1, 0);
+  els.code.focus();
+  els.code.setSelectionRange(pos, pos + (lines[lineNo - 1] || '').length);
+}
+
+/* ---- startup ------------------------------------------------------------ */
+
+function init() {
+  workspace = createWorkspace('blockly');
+
+  const savedBlocks = localStorage.getItem(KEYS.blocks);
+  try {
+    loadProgram(workspace, savedBlocks ? JSON.parse(savedBlocks) : null);
+  } catch (err) {
+    loadProgram(workspace, null);
+  }
+
+  els.code.value = localStorage.getItem(KEYS.python) ?? STARTER_PYTHON;
+  els.name.value = localStorage.getItem(KEYS.name) || '';
+
+  els.name.addEventListener('input', () => {
+    localStorage.setItem(KEYS.name, els.name.value);
+  });
+
+  workspace.addChangeListener(() => {
+    if (workspace.isDragging()) return;
+    localStorage.setItem(KEYS.blocks, JSON.stringify(saveProgram(workspace)));
+    const lines = describe(workspace);
+    els.steps.textContent = lines.length ? lines.join('\n') : 'Drag some blocks to build a flight.';
+  });
+
+  els.steps.textContent = describe(workspace).join('\n') || 'Drag some blocks to build a flight.';
+  renderGutter();
+  setMode(localStorage.getItem(KEYS.mode) === 'python' ? 'python' : 'blocks');
+}
+
 window.addEventListener('resize', () => {
-  if (workspace) Blockly.svgResize(workspace);
+  if (workspace && mode === 'blocks') Blockly.svgResize(workspace);
 });
 
 init();

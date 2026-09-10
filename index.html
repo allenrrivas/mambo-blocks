@@ -10,6 +10,10 @@
 <div id="app">
   <header>
     <h1>Mambo Blocks</h1>
+    <div class="modes" role="tablist">
+      <button id="mode-blocks" class="mode active" role="tab">Blocks</button>
+      <button id="mode-python" class="mode" role="tab">Python</button>
+    </div>
     <label class="namefield">
       your name
       <input id="name" type="text" placeholder="e.g. Sam" autocomplete="off" maxlength="40">
@@ -20,9 +24,32 @@
 
   <main>
     <div id="blockly"></div>
+
+    <div id="editor" hidden>
+      <div id="gutter" aria-hidden="true"></div>
+      <textarea id="code" spellcheck="false" autocapitalize="off"
+                autocomplete="off" autocorrect="off" wrap="off"></textarea>
+    </div>
+
     <aside id="side">
-      <h2>What it will do</h2>
+      <h2 id="side-title">What it will do</h2>
       <pre id="steps"></pre>
+      <div id="help" hidden>
+        <h2>Things you can say</h2>
+        <pre class="api">takeoff()
+land()
+hover(2)
+
+fly("forward", 1, 40)
+   forward backward
+   left right up down
+
+turn("right", 90)
+flip("front")
+
+wait(1)
+print("hello")</pre>
+      </div>
       <p class="hint">
         Your teacher flies the drone from their laptop. Build your flight,
         put your name in, then tap <strong>Send to teacher</strong>.

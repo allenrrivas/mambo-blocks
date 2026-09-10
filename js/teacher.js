@@ -5,6 +5,7 @@
 
 import { MamboBLE } from './mambo-ble.js';
 import { Runner } from './runner.js';
+import { PythonRunner } from './python-runner.js';
 import { createWorkspace, loadProgram, describe } from './workspace.js';
 
 const POLL_MS = 2000;
@@ -12,6 +13,11 @@ const POLL_MS = 2000;
 const els = {
   queue: document.getElementById('queue'),
   steps: document.getElementById('steps'),
+  source: document.getElementById('source'),
+  blockly: document.getElementById('blockly'),
+  sideTitle: document.getElementById('side-title'),
+  output: document.getElementById('output'),
+  outputTitle: document.getElementById('output-title'),
   status: document.getElementById('status'),
   selected: document.getElementById('selected'),
   battery: document.getElementById('battery'),
@@ -25,9 +31,20 @@ const els = {
 
 const drone = new MamboBLE();
 let workspace = null;
-let runner = null;
+let runner = null;      // blocks
+let pyRunner = null;    // python
 let queue = [];
 let selectedId = null;
+
+/** Whichever runner owns the current program. */
+function activeRunner() {
+  const item = queue.find((q) => q.id === selectedId);
+  return item && item.mode === 'python' ? pyRunner : runner;
+}
+
+function anyRunning() {
+  return (runner && runner.running) || (pyRunner && pyRunner.running);
+}
 
 function log(msg) {
   const line = document.createElement('div');
@@ -42,7 +59,7 @@ function setStatus(text, cls) {
 }
 
 function updateButtons() {
-  const ready = drone.connected && !!selectedId && !(runner && runner.running);
+  const ready = drone.connected && !!selectedId && !anyRunning();
   els.fly.disabled = !ready;
   els.land.disabled = !drone.connected;
 }
@@ -89,9 +106,26 @@ function select(id) {
   const item = queue.find((q) => q.id === id);
   if (!item) return;
   selectedId = id;
-  loadProgram(workspace, item.program);
-  els.steps.textContent = describe(workspace).join('\n') || '(empty program)';
   els.selected.textContent = `showing ${item.name}`;
+  els.output.textContent = '';
+  els.output.hidden = true;
+  els.outputTitle.hidden = true;
+
+  if (item.mode === 'python') {
+    els.blockly.hidden = true;
+    els.source.hidden = false;
+    els.source.textContent = item.program;
+    els.steps.textContent = 'Python program — read the code before flying it.';
+    els.sideTitle.textContent = 'Heads up';
+  } else {
+    els.source.hidden = true;
+    els.blockly.hidden = false;
+    loadProgram(workspace, item.program);
+    Blockly.svgResize(workspace);
+    els.steps.textContent = describe(workspace).join('\n') || '(empty program)';
+    els.sideTitle.textContent = 'What it will do';
+  }
+
   renderQueue();
   updateButtons();
 }
@@ -151,27 +185,41 @@ els.connect.addEventListener('click', async () => {
 els.fly.addEventListener('click', async () => {
   const item = queue.find((q) => q.id === selectedId);
   if (!item) return;
-  log(`--- flying ${item.name}'s program ---`);
-  updateButtons();
-  await runner.run(workspace);
+  log(`--- flying ${item.name}'s ${item.mode} program ---`);
+  els.fly.disabled = true;
+
+  if (item.mode === 'python') {
+    els.output.textContent = '';
+    els.output.hidden = false;
+    els.outputTitle.hidden = false;
+    await pyRunner.run(item.program);
+  } else {
+    await runner.run(workspace);
+  }
+
   await markStatus(item.id, 'flown');
   await poll();
   updateButtons();
 });
 
-els.stop.addEventListener('click', () => runner && runner.stop());
+function stopEverything() {
+  if (runner && runner.running) runner.stop();
+  if (pyRunner && pyRunner.running) pyRunner.stop();
+}
+
+els.stop.addEventListener('click', stopEverything);
 
 els.land.addEventListener('click', async () => {
-  if (runner) runner.stop();
+  stopEverything();
   await drone.land();
   log('Manual land.');
 });
 
 // Background tabs get throttled to ~1Hz, which starves the PCMD heartbeat.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && runner && runner.running) {
+  if (document.hidden && anyRunning()) {
     log('Page hidden — landing for safety.');
-    runner.stop();
+    stopEverything();
   }
 });
 
@@ -183,6 +231,13 @@ workspace = createWorkspace('blockly', { toolbox: false });
 runner = new Runner(drone, {
   onLog: log,
   onHighlight: (id) => workspace.highlightBlock(id),
+});
+pyRunner = new PythonRunner(drone, {
+  onLog: log,
+  onPrint: (text) => {
+    els.output.textContent += `${text}\n`;
+    els.output.scrollTop = els.output.scrollHeight;
+  },
 });
 setConnectedUI(false);
 log('Ready. Connect the drone, then pick a submission.');

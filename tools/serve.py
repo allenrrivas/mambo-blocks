@@ -134,6 +134,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if program is None:
             return self._json({"error": "missing program"}, 400)
 
+        # We are Python, so we can check a student's syntax with the real
+        # parser for free and tell them before it ever reaches the drone.
+        # Beats finding out when the teacher tries to fly it.
+        if mode == "python":
+            if not isinstance(program, str):
+                return self._json({"error": "python program must be text"}, 400)
+            try:
+                compile(program, "<student>", "exec")
+            except SyntaxError as exc:
+                return self._json({
+                    "error": "syntax",
+                    "line": exc.lineno,
+                    "message": exc.msg,
+                }, 400)
+
         item = {
             "id": uuid.uuid4().hex[:10],
             "name": name,
