@@ -62,6 +62,36 @@ Resubmitting replaces their pending entry rather than adding another, so nobody
 can flood the queue. Submissions persist to `submissions.jsonl`, so restarting
 the server mid-lesson is not a disaster.
 
+## Seeing the Python for your blocks
+
+In blocks mode, **Show Python** opens a read-only pane with the Python
+equivalent, regenerated as the blocks change:
+
+```python
+takeoff()
+fly("up", 1.5, 50)
+for i in range(4):
+    fly("forward", 1, 40)
+    turn("right", 90)
+flip_times("front", 3, 1.2)
+land()
+```
+
+Students get the same program three ways at once - blocks, Python, and the
+plain-English steps - which is the point of having both modes in one app
+rather than two separate tools. It is read-only on purpose: nothing to
+reconcile, and no way to lose a Python draft by switching modes. The toggle
+remembers its setting, and hides itself in Python mode where the code is
+already the main view.
+
+`toPython()` in `workspace.js` is a separate walker from `runner.js`. The
+runner drives the drone; this only has to be readable and correct enough to
+learn from. It emits calls from the same API `py-worker.js` exposes, so what a
+student sees is genuinely runnable in Python mode - verified by feeding
+generated output through the server's CPython syntax check. Nested repeats get
+`i`, `j`, `k` rather than shadowing, and an empty loop emits `pass` so the
+result always compiles.
+
 ## Python mode
 
 Students can switch from blocks to Python and write plain, synchronous code:
@@ -268,8 +298,6 @@ this design rests on.
 
 ## Not built yet
 
-- **A "Show Python" button** on the block view, so students can see the text
-  equivalent of what they built. Blockly has code generation built in.
 - **C++ mode.** Harder to justify: JSCPP has been dormant since 2021, and
   clang-in-WASM is ~40 MB and experimental. A purpose-built C-subset
   interpreter would be the honest path if a curriculum demands it.

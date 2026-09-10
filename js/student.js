@@ -4,7 +4,9 @@
  * Safari over plain HTTP.
  */
 
-import { createWorkspace, saveProgram, loadProgram, describe, isEmpty } from './workspace.js';
+import {
+  createWorkspace, saveProgram, loadProgram, describe, isEmpty, toPython,
+} from './workspace.js';
 import { createCodeEditor, highlightBlock } from './code-editor.js';
 
 const KEYS = {
@@ -12,6 +14,7 @@ const KEYS = {
   python: 'mambo-blocks-python',
   name: 'mambo-blocks-name',
   mode: 'mambo-blocks-mode',
+  preview: 'mambo-blocks-preview',
 };
 
 const STARTER_PYTHON = `# Fly the drone with Python.
@@ -33,16 +36,53 @@ const els = {
   editor: document.getElementById('editor'),
   modeBlocks: document.getElementById('mode-blocks'),
   modePython: document.getElementById('mode-python'),
+  preview: document.getElementById('preview'),
+  previewCode: document.getElementById('preview-code'),
+  togglePreview: document.getElementById('toggle-preview'),
+  closePreview: document.getElementById('close-preview'),
 };
 
 let workspace = null;
 let editor = null;
 let mode = 'blocks';
+let previewOn = false;
 
 function setStatus(text, cls = '') {
   els.status.textContent = text;
   els.status.className = `status ${cls}`;
 }
+
+/* ---- read-only Python preview ------------------------------------------- */
+
+function refreshPreview() {
+  if (!previewOn || mode !== 'blocks') return;
+  const code = toPython(workspace);
+  if (code.trim()) {
+    highlightBlock(els.previewCode, code);
+  } else {
+    els.previewCode.innerHTML =
+      '<span class="empty-note"># drag some blocks and the Python appears here</span>';
+  }
+}
+
+function applyPreview() {
+  // Only meaningful next to the blocks; Python mode already shows the code.
+  const visible = previewOn && mode === 'blocks';
+  els.preview.hidden = !visible;
+  els.togglePreview.textContent = previewOn ? 'Hide Python' : 'Show Python';
+  els.togglePreview.hidden = mode !== 'blocks';
+  if (visible) refreshPreview();
+  if (workspace && mode === 'blocks') Blockly.svgResize(workspace);
+}
+
+function setPreview(on) {
+  previewOn = on;
+  localStorage.setItem(KEYS.preview, on ? '1' : '0');
+  applyPreview();
+}
+
+els.togglePreview.addEventListener('click', () => setPreview(!previewOn));
+els.closePreview.addEventListener('click', () => setPreview(false));
 
 /* ---- mode switching ----------------------------------------------------- */
 
@@ -61,6 +101,7 @@ function setMode(next) {
   localStorage.setItem(KEYS.mode, next);
   setStatus('');
 
+  applyPreview();
   if (!python && workspace) Blockly.svgResize(workspace);
 }
 
@@ -157,6 +198,7 @@ function init() {
   });
 
   els.steps.textContent = describe(workspace).join('\n') || 'Drag some blocks to build a flight.';
+  previewOn = localStorage.getItem(KEYS.preview) === '1';
   setMode(localStorage.getItem(KEYS.mode) === 'python' ? 'python' : 'blocks');
 }
 

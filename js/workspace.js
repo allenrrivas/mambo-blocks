@@ -39,6 +39,74 @@ export function isEmpty(workspace) {
   return workspace.getTopBlocks(false).filter((b) => !b.isShadow()).length === 0;
 }
 
+/** Field numbers arrive as 2 or "2"; render 2 rather than 2.0, 1.5 as 1.5. */
+function num(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '0';
+  return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(2)));
+}
+
+/** Loop counters by nesting depth, so nested repeats do not shadow i. */
+const COUNTERS = ['i', 'j', 'k', 'm', 'n'];
+
+/**
+ * The Python equivalent of a block program, for the read-only preview.
+ *
+ * Deliberately a separate walker from runner.js rather than a code path the
+ * drone uses: this only has to be readable and correct for a student to learn
+ * from. It emits calls from the same API py-worker.js exposes, so what it
+ * shows is genuinely runnable in Python mode.
+ */
+export function toPython(workspace) {
+  const lines = [];
+
+  const walk = (block, depth) => {
+    let b = block;
+    while (b) {
+      const pad = '    '.repeat(depth);
+      const f = (n) => b.getFieldValue(n);
+
+      switch (b.type) {
+        case 'mambo_takeoff': lines.push(`${pad}takeoff()`); break;
+        case 'mambo_land': lines.push(`${pad}land()`); break;
+        case 'mambo_hover': lines.push(`${pad}hover(${num(f('SECONDS'))})`); break;
+        case 'mambo_move':
+          lines.push(`${pad}fly("${f('DIRECTION')}", ${num(f('SECONDS'))}, ${num(f('SPEED'))})`);
+          break;
+        case 'mambo_turn':
+          lines.push(`${pad}turn("${f('DIRECTION')}", ${num(f('DEGREES'))})`);
+          break;
+        case 'mambo_flip': lines.push(`${pad}flip("${f('DIRECTION')}")`); break;
+        case 'mambo_multiflip':
+          lines.push(`${pad}flip_times("${f('DIRECTION')}", ${num(f('TIMES'))}, ${num(f('GAP'))})`);
+          break;
+        case 'mambo_emergency': lines.push(`${pad}emergency()`); break;
+
+        case 'controls_repeat_ext': {
+          const target = b.getInputTargetBlock('TIMES');
+          const times = target && target.type === 'math_number'
+            ? num(target.getFieldValue('NUM'))
+            : '1';
+          const counter = COUNTERS[depth] || `x${depth}`;
+          lines.push(`${pad}for ${counter} in range(${times}):`);
+          const body = b.getInputTargetBlock('DO');
+          if (body) walk(body, depth + 1);
+          else lines.push(`${pad}    pass`); // an empty loop is still valid Python
+          break;
+        }
+
+        default:
+          lines.push(`${pad}# ${b.type}`);
+      }
+
+      b = b.getNextBlock();
+    }
+  };
+
+  workspace.getTopBlocks(true).filter((b) => !b.isShadow()).forEach((b) => walk(b, 0));
+  return lines.join('\n');
+}
+
 /**
  * Plain-English summary of a program, so the teacher can see what a
  * submission will do without reading blocks, and students can sanity-check

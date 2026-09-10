@@ -349,3 +349,60 @@ pre.api {
 #help summary::before { content: "▸ "; }
 #help details[open] summary::before { content: "▾ "; }
 #help details[open] summary { margin-bottom: 8px; }
+
+/* ---- read-only Python preview beside the blocks ---- */
+
+button.small { padding: 9px 13px; min-height: 40px; font-size: 13px; }
+
+#preview {
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid #181a1f;
+  background: #282c34;
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #181a1f;
+  background: #21252b;
+  color: #8b93a1;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 650;
+}
+
+button.linkish {
+  background: transparent;
+  color: #8b93a1;
+  border-radius: 6px;
+  padding: 2px 8px;
+  min-height: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+button.linkish:hover { color: #e6e9ef; background: #2c313a; }
+
+#preview-code {
+  margin: 0;
+  padding: 14px 16px;
+  flex: 1;
+  overflow: auto;
+  color: #abb2bf;
+  font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+  tab-size: 4;
+}
+
+#preview-code .empty-note { color: #5c6370; font-style: italic; }
+
+/* On a narrow iPad the blocks canvas needs the room more than the preview. */
+@media (max-width: 900px) {
+  #preview { width: 260px; }
+}

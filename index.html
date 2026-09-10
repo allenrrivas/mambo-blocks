@@ -18,6 +18,7 @@
       your name
       <input id="name" type="text" placeholder="e.g. Sam" autocomplete="off" maxlength="40">
     </label>
+    <button id="toggle-preview" class="ghost small">Show Python</button>
     <button id="submit" class="go">Send to teacher</button>
     <span id="status" class="status"></span>
   </header>
@@ -26,6 +27,14 @@
     <div id="blockly"></div>
 
     <div id="editor" hidden></div>
+
+    <div id="preview" hidden>
+      <div class="preview-bar">
+        <span>Python for these blocks</span>
+        <button id="close-preview" class="linkish" title="Hide">&times;</button>
+      </div>
+      <pre id="preview-code"></pre>
+    </div>
 
     <aside id="side">
       <h2 id="side-title">What it will do</h2>
