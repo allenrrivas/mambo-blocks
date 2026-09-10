@@ -129,6 +129,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json({"error": "expected a JSON object"}, 400)
 
         name = str(data.get("name") or "").strip()[:40] or "anonymous"
+        # Identity is the device, not the name. Two students called Sam used to
+        # share one queue slot, and the second submission silently replaced the
+        # first - in a class of thirty, duplicate first names are a certainty.
+        client = str(data.get("client") or "")[:64]
         mode = data.get("mode") if data.get("mode") in ("blocks", "python") else "blocks"
         program = data.get("program")
         if program is None:
@@ -152,16 +156,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         item = {
             "id": uuid.uuid4().hex[:10],
             "name": name,
+            "client": client,
             "mode": mode,
             "program": program,
             "submitted_at": time.time(),
             "status": "waiting",
         }
         with _lock:
-            # One pending submission per student: resubmitting replaces the
-            # old one rather than letting a kid spam the queue.
+            # One pending submission per device: resubmitting replaces the
+            # old one rather than letting a kid spam the queue. Falls back to
+            # the name only when a client id is missing.
             for i, existing in enumerate(_queue):
-                if existing["name"] == name and existing["status"] == "waiting":
+                if client:
+                    same = existing.get("client") == client
+                else:
+                    same = existing["name"] == name
+                if same and existing["status"] == "waiting":
                     _queue[i] = item
                     rewrite_queue()
                     break

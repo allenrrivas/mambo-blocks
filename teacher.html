@@ -20,10 +20,14 @@
     </div>
     <span id="selected" class="status"></span>
     <button id="connect" class="ghost">Connect drone</button>
+    <button id="trim" class="ghost small" disabled title="Re-level the drone. Put it on a flat surface first.">Flat trim</button>
     <button id="fly" class="go" disabled>Fly this</button>
+    <button id="skip" class="ghost small" disabled>Skip</button>
     <button id="land" class="ghost" disabled>Land</button>
     <button id="stop" class="stop">STOP</button>
   </header>
+
+  <div id="battery-warning" class="banner" hidden></div>
 
   <div id="warning">
     This browser has no Web Bluetooth. Use Chrome or Edge on the laptop —
@@ -41,7 +45,10 @@
       <pre id="output" hidden></pre>
       <p class="hint">
         Pick a submission, read the steps, then <strong>Fly this</strong>.
-        Programs are shown read-only — nothing here can be edited by accident.
+        Programs are read-only, but you can pan and zoom to look around.
+      </p>
+      <p class="hint">
+        <button id="clear-queue" class="ghost small">Clear the queue</button>
       </p>
     </aside>
   </main>

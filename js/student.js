@@ -15,7 +15,23 @@ const KEYS = {
   name: 'mambo-blocks-name',
   mode: 'mambo-blocks-mode',
   preview: 'mambo-blocks-preview',
+  client: 'mambo-blocks-client',
 };
+
+/**
+ * A stable id for this device, so resubmitting replaces this student's own
+ * pending program and nobody else's. Two students sharing a first name used
+ * to overwrite each other silently.
+ */
+function clientId() {
+  let id = localStorage.getItem(KEYS.client);
+  if (!id) {
+    id = (crypto.randomUUID && crypto.randomUUID())
+      || `c${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(KEYS.client, id);
+  }
+  return id;
+}
 
 const STARTER_PYTHON = `# Fly the drone with Python.
 # Look at "Things you can say" for everything you can do.
@@ -139,7 +155,7 @@ els.submit.addEventListener('click', async () => {
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, mode, program }),
+      body: JSON.stringify({ name, mode, program, client: clientId() }),
     });
     const data = await res.json().catch(() => ({}));
 

@@ -188,6 +188,17 @@ mistake on line 2 gets reported as line 46.
 
 ## Safety notes
 
+- **STOP always lands**, whether or not a program is running. It used to return
+  early when nothing was running, which is exactly the state you are in when a
+  program ends without `land()` - the red button did nothing at the moment
+  someone would most want it.
+- **A program that never says `land()` is landed for you** when it finishes,
+  rather than leaving the drone hovering until the battery gives out.
+- **A mid-flight disconnect stops the program.** Both runners used to check the
+  link only at the start, and would keep issuing commands into a dead
+  connection.
+- **Flying is refused below 15% battery.** Mambos get erratic and drop hard on a
+  low cell. Land and STOP keep working; there is a warning banner from 30%.
 - **STOP lands, it does not cut the motors.** The red `EMERGENCY STOP` block in
   the Safety category cuts motors instantly — the drone will *fall*. That is the
   right behaviour for a fly-away and the wrong behaviour for everything else.

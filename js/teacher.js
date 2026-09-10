@@ -11,6 +11,10 @@ import { highlightBlock } from './code-editor.js';
 
 const POLL_MS = 2000;
 
+/* Below this the Mambo gets erratic and drops hard rather than landing, so
+   refuse to launch. Flying already in progress is never interrupted by it. */
+const MIN_BATTERY = 15;
+
 const els = {
   queue: document.getElementById('queue'),
   steps: document.getElementById('steps'),
@@ -28,6 +32,10 @@ const els = {
   land: document.getElementById('land'),
   stop: document.getElementById('stop'),
   log: document.getElementById('log'),
+  trim: document.getElementById('trim'),
+  skip: document.getElementById('skip'),
+  clearQueue: document.getElementById('clear-queue'),
+  batteryWarning: document.getElementById('battery-warning'),
 };
 
 const drone = new MamboBLE();
@@ -36,12 +44,6 @@ let runner = null;      // blocks
 let pyRunner = null;    // python
 let queue = [];
 let selectedId = null;
-
-/** Whichever runner owns the current program. */
-function activeRunner() {
-  const item = queue.find((q) => q.id === selectedId);
-  return item && item.mode === 'python' ? pyRunner : runner;
-}
 
 function anyRunning() {
   return (runner && runner.running) || (pyRunner && pyRunner.running);
@@ -60,9 +62,27 @@ function setStatus(text, cls) {
 }
 
 function updateButtons() {
-  const ready = drone.connected && !!selectedId && !anyRunning();
-  els.fly.disabled = !ready;
+  const running = anyRunning();
+  const lowBattery = drone.battery !== null && drone.battery < MIN_BATTERY;
+  els.fly.disabled = !(drone.connected && !!selectedId && !running && !lowBattery);
   els.land.disabled = !drone.connected;
+  els.trim.disabled = !drone.connected || running;
+  els.skip.disabled = !selectedId || running;
+
+  if (lowBattery) {
+    els.batteryWarning.hidden = false;
+    els.batteryWarning.className = 'banner bad';
+    els.batteryWarning.textContent =
+      `Battery is ${drone.battery}% — too low to fly safely. Charge or swap it. `
+      + 'Land and STOP still work.';
+  } else if (drone.battery !== null && drone.battery < 30) {
+    els.batteryWarning.hidden = false;
+    els.batteryWarning.className = 'banner';
+    els.batteryWarning.textContent =
+      `Battery is ${drone.battery}% — a couple of flights left at most.`;
+  } else {
+    els.batteryWarning.hidden = true;
+  }
 }
 
 function setConnectedUI(connected) {
@@ -164,7 +184,8 @@ async function markStatus(id, status) {
 drone.on('log', log);
 drone.on('battery', (pct) => {
   els.battery.textContent = `${pct}%`;
-  els.battery.className = pct < 20 ? 'value low' : 'value';
+  els.battery.className = pct < MIN_BATTERY ? 'value low' : 'value';
+  updateButtons();
 });
 drone.on('state', (s) => { els.state.textContent = s; });
 drone.on('disconnect', () => setConnectedUI(false));
@@ -206,17 +227,71 @@ els.fly.addEventListener('click', async () => {
   updateButtons();
 });
 
-function stopEverything() {
+/**
+ * The red button has to mean something at all times. A program that ends
+ * without land() leaves the drone hovering with nothing running, and the old
+ * version returned early in exactly that case - so STOP did nothing at the
+ * moment someone would most want it.
+ */
+async function stopEverything() {
+  const wasRunning = anyRunning();
   if (runner && runner.running) runner.stop();
   if (pyRunner && pyRunner.running) pyRunner.stop();
+
+  // A running program lands the drone itself as it unwinds; if nothing was
+  // running, that is on us.
+  if (!wasRunning && drone.connected) {
+    log('STOP pressed — landing.');
+    try {
+      await drone.land();
+    } catch (err) {
+      log(`Could not send land: ${err.message}`);
+    }
+  }
+  updateButtons();
 }
 
 els.stop.addEventListener('click', stopEverything);
 
 els.land.addEventListener('click', async () => {
-  stopEverything();
-  await drone.land();
-  log('Manual land.');
+  await stopEverything();
+});
+
+els.trim.addEventListener('click', async () => {
+  try {
+    await drone.flatTrim();
+    log('Flat trim sent. Drone must be on a level surface for this to help.');
+  } catch (err) {
+    log(`Flat trim failed: ${err.message}`);
+  }
+});
+
+els.skip.addEventListener('click', async () => {
+  const item = queue.find((q) => q.id === selectedId);
+  if (!item) return;
+  await markStatus(item.id, 'skipped');
+  log(`Skipped ${item.name}'s program.`);
+  selectedId = null;
+  await poll();
+  updateButtons();
+});
+
+els.clearQueue.addEventListener('click', async () => {
+  const waiting = queue.filter((q) => q.status === 'waiting').length;
+  // This throws away student work, so make them mean it.
+  if (!window.confirm(
+    `Clear all ${queue.length} submissions (${waiting} still waiting)?
+
+`
+    + 'This cannot be undone.')) return;
+  try {
+    await fetch('/api/clear', { method: 'POST' });
+    selectedId = null;
+    await poll();
+    log('Queue cleared.');
+  } catch (err) {
+    log(`Could not clear the queue: ${err.message}`);
+  }
 });
 
 // Background tabs get throttled to ~1Hz, which starves the PCMD heartbeat.

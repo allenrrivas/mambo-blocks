@@ -32,7 +32,27 @@ export class Runner {
     this.onLog('STOP pressed — landing.');
   }
 
-  _shouldAbort() { return this.aborted; }
+  /** Abort on STOP, and also if the link dies underneath us. */
+  _shouldAbort() { return this.aborted || !this.drone.connected; }
+
+  /**
+   * Land without ever throwing. If we are landing because the link dropped,
+   * the write will fail - and an exception there would skip the cleanup that
+   * follows it.
+   */
+  async _safeLand(why) {
+    if (why) this.onLog(why);
+    try {
+      await this.drone.land();
+    } catch (err) {
+      this.onLog(`Could not send land: ${err.message}`);
+    }
+  }
+
+  /** Is the drone off the ground, according to its own telemetry? */
+  _airborne() {
+    return ['takingoff', 'hovering', 'flying'].includes(this.drone.flyingState);
+  }
 
   /** setTimeout that wakes early when STOP is pressed. */
   async _sleep(ms) {
@@ -62,15 +82,24 @@ export class Runner {
     try {
       for (const top of tops) {
         await this._runChain(top);
-        if (this.aborted) break;
+        if (this._shouldAbort()) break;
       }
-      if (this.aborted) {
-        await this.drone.land();
+
+      if (!this.drone.connected) {
+        this.onLog('Lost the drone mid-program.');
+      } else if (this.aborted) {
+        await this._safeLand();
+        this.onLog('Stopped.');
+      } else if (this._airborne()) {
+        // A program that never says land() would otherwise leave the drone
+        // hovering until the battery gives out.
+        await this._safeLand('Program ended without land() — landing.');
+        this.onLog('Program finished.');
+      } else {
+        this.onLog('Program finished.');
       }
-      this.onLog(this.aborted ? 'Stopped.' : 'Program finished.');
     } catch (err) {
-      this.onLog(`Error: ${err.message}. Landing.`);
-      await this.drone.land();
+      await this._safeLand(`Error: ${err.message}. Landing.`);
     } finally {
       this.onHighlight(null);
       this.running = false;
@@ -81,6 +110,11 @@ export class Runner {
   async _runChain(block) {
     let current = block;
     while (current && !this.aborted) {
+      if (!this.drone.connected) {
+        this.aborted = true;
+        this.onLog('Drone disconnected — stopping the program.');
+        break;
+      }
       if (!current.isEnabled || current.isEnabled()) {
         await this._runBlock(current);
       }

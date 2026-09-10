@@ -29,7 +29,27 @@ export class PythonRunner {
     this._ready = null;
   }
 
-  _shouldAbort() { return this.aborted; }
+  /** Abort on STOP, and also if the link dies underneath us. */
+  _shouldAbort() { return this.aborted || !this.drone.connected; }
+
+  /**
+   * Land without ever throwing. If we are landing because the link dropped,
+   * the write will fail - and an exception there would skip the cleanup that
+   * follows it.
+   */
+  async _safeLand(why) {
+    if (why) this.onLog(why);
+    try {
+      await this.drone.land();
+    } catch (err) {
+      this.onLog(`Could not send land: ${err.message}`);
+    }
+  }
+
+  /** Is the drone off the ground, according to its own telemetry? */
+  _airborne() {
+    return ['takingoff', 'hovering', 'flying'].includes(this.drone.flyingState);
+  }
 
   /** Abortable sleep, so STOP does not have to wait out a long hover. */
   async _sleep(ms) {
@@ -82,6 +102,10 @@ export class PythonRunner {
   }
 
   async _handleCall({ id, fn, args }) {
+    if (!this.drone.connected && !this.aborted) {
+      this.aborted = true;
+      this.onLog('Drone disconnected — stopping the program.');
+    }
     if (this.aborted) {
       // Refuse politely rather than hanging the worker; it is about to die.
       this.worker.postMessage({ type: 'result', id, ok: false, error: 'stopped' });
