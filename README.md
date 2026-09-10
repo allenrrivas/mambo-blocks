@@ -122,7 +122,19 @@ sits on the character it is supposed to.
 | `fly("forward", 1, 40)` | `fly_direct(roll=, pitch=, yaw=, vertical_movement=, duration=)` |
 | `turn("right", 90)` | `turn_degrees(90)` |
 | `flip("front")` | `flip("front")` |
+| `flip_times("front", 3, 1.2)` | - |
 | `emergency()` | `emergency()` |
+
+`flip_times(direction, times, gap)` chains flips without the settle between
+them, matching the multi-flip block. It rejects out-of-range values rather than
+clamping them - a student who asks for 20 flips is told no, not quietly given
+five - and each drone call validates its arguments, so mistakes surface as
+`line 4: flip_times(): times must be between 2 and 5, got 20`.
+
+Every other call carries an automatic settle: `takeoff()` does not return for
+~3s, `flip()` for ~2.5s, `turn()` for ~1.5s. So `for i in range(3):
+flip("front")` will *not* reproduce `flip_times` - that is what the dedicated
+call is for.
 
 The aliases are deliberate: code written here transfers to a real Python
 environment with pyparrot later, so the iPad is an on-ramp rather than a

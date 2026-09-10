@@ -36,6 +36,7 @@ const host = {
   turn: (d, deg) => callHost('turn', [d, deg]),
   turn_degrees: (deg) => callHost('turn_degrees', [deg]),
   flip: (d) => callHost('flip', [d]),
+  flip_times: (d, t, g) => callHost('flip_times', [d, t, g]),
   emergency: () => callHost('emergency', []),
   sleep: (s) => callHost('sleep', [s]),
 };
@@ -74,6 +75,15 @@ def turn(direction, degrees=90):
 def flip(direction='front'):
     """Barrel roll: front, back, left or right. Needs clear space."""
     _run_sync(_host.flip(direction))
+
+def flip_times(direction='front', times=3, gap=1.2):
+    """Chain flips back to back without settling in between.
+
+    Each flip loses height and this skips the recovery, so climb first
+    and leave plenty of room. Gaps under about a second may be ignored
+    by the drone, which will not start a flip while recovering.
+    """
+    _run_sync(_host.flip_times(direction, times, gap))
 
 def emergency():
     """Cut the motors immediately. The drone will fall."""

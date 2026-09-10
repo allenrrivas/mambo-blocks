@@ -162,6 +162,36 @@ export class PythonRunner {
         return this._sleep(SETTLE.flip);
       }
 
+      case 'flip_times': {
+        const dir = String(args[0] || 'front');
+        const times = Number(args[1]);
+        const gap = Number(args[2]);
+        if (!['front', 'back', 'left', 'right'].includes(dir)) {
+          throw new Error(`flip_times(): direction must be front, back, left or right, got "${dir}"`);
+        }
+        // Explicit errors rather than silent clamping: a student who asks for
+        // 20 flips should be told no, not quietly given 5.
+        if (!Number.isFinite(times) || times < 2 || times > 5) {
+          throw new Error(`flip_times(): times must be between 2 and 5, got ${args[1]}`);
+        }
+        if (!Number.isFinite(gap) || gap < 0.2 || gap > 3) {
+          throw new Error(`flip_times(): gap must be between 0.2 and 3 seconds, got ${args[2]}`);
+        }
+
+        this.onLog(`flip ${dir} x${times}, ${gap}s apart`);
+        for (let i = 0; i < times && !this.aborted; i += 1) {
+          this.onLog(`  flip ${i + 1}/${times}`);
+          await d.flip(dir);
+          // No settle between flips - that is the point. Only the gap.
+          if (i < times - 1) await this._sleep(gap * 1000);
+        }
+        if (!this.aborted) {
+          this.onLog('  recovering');
+          await this._sleep(SETTLE.flip);
+        }
+        return undefined;
+      }
+
       case 'emergency':
         this.onLog('EMERGENCY STOP');
         this.aborted = true;

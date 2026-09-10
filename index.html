@@ -32,20 +32,76 @@
       <pre id="steps"></pre>
       <div id="help" hidden>
         <h2>Things you can say</h2>
-        <pre class="api">takeoff()
+
+        <h3>Flying</h3>
+<pre class="api">takeoff()
 land()
 hover(2)
+wait(1)</pre>
 
-fly("forward", 1, 40)
-   forward backward
-   left right up down
+        <h3>Moving</h3>
+<pre class="api">fly("forward", 1, 40)
+turn("right", 90)</pre>
+        <p class="apinote">
+          <b>fly</b> direction, seconds, speed<br>
+          forward &middot; backward &middot; left<br>
+          right &middot; up &middot; down<br>
+          speed 5&ndash;100
+        </p>
+        <p class="apinote">
+          <b>turn</b> "left" or "right",<br>
+          1&ndash;180 degrees
+        </p>
 
-turn("right", 90)
-flip("front")
+        <h3>Tricks</h3>
+<pre class="api">flip("front")
+flip_times("front", 3, 1.2)</pre>
+        <p class="apinote">
+          front &middot; back &middot; left &middot; right<br>
+          <b>flip_times</b> skips the settle
+          between flips &mdash; climb first.
+          2&ndash;5 flips, gap 0.2&ndash;3s.
+        </p>
 
-wait(1)
-print("hello")</pre>
+        <h3>Safety</h3>
+<pre class="api">emergency()</pre>
+        <p class="apinote">
+          Cuts the motors. The drone
+          <b>falls</b>. Only for a fly-away.
+        </p>
+
+        <h3>Showing things</h3>
+<pre class="api">print("hello", 1 + 2)</pre>
+        <p class="apinote">
+          Appears on your teacher's screen.
+        </p>
+
+        <details>
+          <summary>Real-Python names</summary>
+          <p class="apinote">
+            The same moves, named the way the
+            grown-up <code>pyparrot</code> library
+            names them.
+          </p>
+<pre class="api">safe_takeoff()
+safe_land()
+smart_sleep(2)
+turn_degrees(90)
+
+fly_direct(roll=0,
+           pitch=30,
+           yaw=0,
+           vertical_movement=0,
+           duration=1)</pre>
+          <p class="apinote">
+            <b>fly_direct</b> mixes directions at
+            once &mdash; forward while climbing,
+            or diagonally. Each value &minus;100
+            to 100.
+          </p>
+        </details>
       </div>
+
       <p class="hint">
         Your teacher flies the drone from their laptop. Build your flight,
         put your name in, then tap <strong>Send to teacher</strong>.

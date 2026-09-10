@@ -5,7 +5,7 @@
  */
 
 import { createWorkspace, saveProgram, loadProgram, describe, isEmpty } from './workspace.js';
-import { createCodeEditor } from './code-editor.js';
+import { createCodeEditor, highlightBlock } from './code-editor.js';
 
 const KEYS = {
   blocks: 'mambo-blocks-workspace',
@@ -136,6 +136,11 @@ function init() {
       localStorage.setItem(KEYS.python, code);
       setStatus('');
     },
+  });
+
+  // The reference panel is Python too, so colour it the same as the editor.
+  document.querySelectorAll('pre.api').forEach((el) => {
+    highlightBlock(el, el.textContent);
   });
 
   els.name.value = localStorage.getItem(KEYS.name) || '';
