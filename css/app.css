@@ -14,6 +14,12 @@
 
 * { box-sizing: border-box; }
 
+/* The hidden attribute gets display:none from the user-agent stylesheet, so
+   any author rule setting display (.code-editor uses flex) silently beats it
+   and the element stays on screen. Everything here toggles visibility with
+   el.hidden, so make that authoritative. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
