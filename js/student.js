@@ -42,7 +42,13 @@ land()
 `;
 
 const els = {
-  name: document.getElementById('name'),
+  app: document.getElementById('app'),
+  gate: document.getElementById('gate'),
+  gateForm: document.getElementById('gate-form'),
+  gateName: document.getElementById('gate-name'),
+  gateError: document.getElementById('gate-error'),
+  who: document.getElementById('who'),
+  notYou: document.getElementById('not-you'),
   submit: document.getElementById('submit'),
   status: document.getElementById('status'),
   steps: document.getElementById('steps'),
@@ -124,13 +130,59 @@ function setMode(next) {
 els.modeBlocks.addEventListener('click', () => setMode('blocks'));
 els.modePython.addEventListener('click', () => setMode('python'));
 
+/* ---- name page ---------------------------------------------------------- */
+
+function currentName() {
+  return (localStorage.getItem(KEYS.name) || '').trim();
+}
+
+/**
+ * Students have to say who they are before they can code, so every
+ * submission in the teacher's queue has a real name on it. The name is
+ * remembered, so a mid-lesson reload does not bounce them back here;
+ * "Not you?" is for the next student on a shared iPad.
+ */
+function showGate() {
+  els.app.inert = true;
+  els.gate.hidden = false;
+  els.gateName.value = '';
+  els.gateError.hidden = true;
+  els.gateName.focus();
+}
+
+function showApp() {
+  els.who.textContent = currentName();
+  els.gate.hidden = true;
+  els.app.inert = false;
+  setStatus('');
+}
+
+els.gateForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = els.gateName.value.trim().replace(/\s+/g, ' ');
+  let problem = '';
+  if (!name) problem = 'Type your name to start.';
+  else if (!/[\p{L}\p{N}]/u.test(name)) problem = 'Your name needs at least one letter.';
+  if (problem) {
+    els.gateError.textContent = problem;
+    els.gateError.hidden = false;
+    els.gateName.focus();
+    return;
+  }
+  localStorage.setItem(KEYS.name, name);
+  showApp();
+});
+
+els.notYou.addEventListener('click', showGate);
+
 /* ---- submitting --------------------------------------------------------- */
 
 els.submit.addEventListener('click', async () => {
-  const name = els.name.value.trim();
+  const name = currentName();
   if (!name) {
-    setStatus('Put your name in first.', 'warn');
-    els.name.focus();
+    // Should not happen - the app is hidden until a name is given - but if
+    // storage was cleared mid-lesson, ask again rather than send "anonymous".
+    showGate();
     return;
   }
 
@@ -200,12 +252,6 @@ function init() {
     highlightBlock(el, el.textContent);
   });
 
-  els.name.value = localStorage.getItem(KEYS.name) || '';
-
-  els.name.addEventListener('input', () => {
-    localStorage.setItem(KEYS.name, els.name.value);
-  });
-
   workspace.addChangeListener(() => {
     if (workspace.isDragging()) return;
     localStorage.setItem(KEYS.blocks, JSON.stringify(saveProgram(workspace)));
@@ -216,6 +262,9 @@ function init() {
   els.steps.textContent = describe(workspace).join('\n') || 'Drag some blocks to build a flight.';
   previewOn = localStorage.getItem(KEYS.preview) === '1';
   setMode(localStorage.getItem(KEYS.mode) === 'python' ? 'python' : 'blocks');
+
+  if (currentName()) showApp();
+  else showGate();
 }
 
 window.addEventListener('resize', () => {

@@ -10,17 +10,39 @@
 <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
-<div id="app">
+<div id="gate">
+  <form id="gate-form" class="gate-card" autocomplete="off">
+    <img src="./favicon.svg" alt="" class="gate-logo">
+    <h1>Mambo Blocks</h1>
+    <label for="gate-name">What's your name?</label>
+    <input id="gate-name" type="text" maxlength="40" placeholder="Type your name"
+           autocapitalize="words" autocorrect="off" spellcheck="false">
+    <button type="submit" class="go">Start coding</button>
+    <p id="gate-error" class="status bad" hidden></p>
+  </form>
+</div>
+<script>
+  // Runs before Blockly finishes downloading, so a student who already gave
+  // their name does not see a flash of "What's your name?" on every reload.
+  try {
+    if ((localStorage.getItem('mambo-blocks-name') || '').trim()) {
+      document.getElementById('gate').hidden = true;
+    }
+  } catch (e) { /* storage blocked: student.js will show the name page */ }
+</script>
+
+<div id="app" inert>
   <header>
     <h1>Mambo Blocks</h1>
     <div class="modes" role="tablist">
       <button id="mode-blocks" class="mode active" role="tab">Blocks</button>
       <button id="mode-python" class="mode" role="tab">Python</button>
     </div>
-    <label class="namefield">
-      your name
-      <input id="name" type="text" placeholder="e.g. Sam" autocomplete="off" maxlength="40">
-    </label>
+    <div class="whoami">
+      <span class="whoami-label">coding as</span>
+      <span id="who" class="whoami-name"></span>
+    </div>
+    <button id="not-you" class="ghost small" type="button">Not you?</button>
     <button id="toggle-preview" class="ghost small">Show Python</button>
     <button id="submit" class="go">Send to teacher</button>
     <span id="status" class="status"></span>

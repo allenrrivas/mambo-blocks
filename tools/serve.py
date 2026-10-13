@@ -163,12 +163,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             "status": "waiting",
         }
         with _lock:
-            # One pending submission per device: resubmitting replaces the
-            # old one rather than letting a kid spam the queue. Falls back to
-            # the name only when a client id is missing.
+            # One pending submission per student: resubmitting replaces the
+            # old one rather than letting a kid spam the queue.
+            #
+            # A pending entry is the same student's only if both the device
+            # and the name match. Device alone is wrong for shared iPads:
+            # with "Not you?", the next student on the same iPad would
+            # silently replace the previous student's waiting program.
+            # Name alone is wrong for two Sams on two iPads.
             for i, existing in enumerate(_queue):
                 if client:
-                    same = existing.get("client") == client
+                    same = existing.get("client") == client and existing["name"] == name
                 else:
                     same = existing["name"] == name
                 if same and existing["status"] == "waiting":

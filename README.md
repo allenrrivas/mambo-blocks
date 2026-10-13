@@ -67,9 +67,16 @@ A submission's blocks can be panned, scrolled, wheeled and zoomed, and are
 centred when you select one. The blocks themselves stay locked, so you cannot
 detach one by accident and fly something other than what the student wrote.
 
-Students put their name in, build a flight, and tap **Send to teacher**.
-Resubmitting replaces their pending entry rather than adding another, so nobody
-can flood the queue. Submissions persist to `submissions.jsonl`, so restarting
+Students start on a **"What's your name?"** page and cannot reach the coding
+page until they give one, so every submission in the queue has a real name on
+it. The name is remembered, so a mid-lesson reload goes straight back to their
+code; **Not you?** in the header returns to the name page for the next student
+on a shared iPad. Then they build a flight and tap **Send to teacher**.
+
+Resubmitting replaces that student's pending entry rather than adding another,
+so nobody can flood the queue. A pending entry belongs to a student only if
+both the iPad and the name match: two Sams on two iPads stay separate, and so
+does the next student on a shared iPad. Submissions persist to `submissions.jsonl`, so restarting
 the server mid-lesson is not a disaster.
 
 ## Seeing the Python for your blocks
