@@ -51,6 +51,12 @@ students -> http://192.168.x.x:8777/
 teacher  -> http://localhost:8777/teacher.html
 ```
 
+**The iPads must be on the same Wi-Fi network as the laptop.** This is the
+first thing to check if students cannot load the page. The first classroom
+test failed only because the laptop was on one network and the iPads on
+another; once both were on the same one it worked immediately. Use the
+address the server prints on the day - it changes between networks.
+
 The teacher console needs **Chrome or Edge**. Safari and Firefox have no Web
 Bluetooth, so they cannot talk to the drone.
 
@@ -181,9 +187,11 @@ mistake on line 2 gets reported as line 46.
 ## Requirements
 
 - **Laptop:** Chrome or Edge, Python 3, Bluetooth LE.
-- **iPads:** any modern browser. Must be able to reach the laptop's IP — some
-  managed school networks use client isolation, which blocks device-to-device
-  traffic and would break this. Test by loading the student URL on one iPad.
+- **iPads:** Safari, nothing to install. They must be on the **same Wi-Fi
+  network as the laptop**. If they are and still cannot load the page, the
+  network may use client isolation (devices can reach the internet but not
+  each other); Windows Mobile Hotspot on the laptop is a quick way to confirm,
+  and a classroom travel router is the fix for a full class.
 - **Drone:** a Parrot Mambo. The FPV camera is not needed; this uses BLE.
 
 ## Safety notes
@@ -298,8 +306,16 @@ and get a real icon.
 
 ## Status
 
-**Flown.** Take off, flip, hover and land confirmed on real hardware, with the
-connection held stable across repeated runs.
+**Working end to end in a classroom.** A student writes a program on an iPad -
+in blocks or in Python - sends it over the school network, and the teacher's
+laptop flies it on the real drone. Confirmed with both modes.
+
+Verified in the classroom:
+
+- iPad (Safari) loads the student page over the school Wi-Fi
+- Submissions from the iPad reach the teacher's queue
+- Block programs and Python programs both fly on the real drone
+- Connection holds across repeated runs
 
 Verified against the drone:
 
@@ -323,9 +339,11 @@ Verified without the drone:
   persistence across restart, and 400s on malformed input
 - Student submit flow and teacher review flow end to end in the browser
 
-Not yet tested: **iPads on the real classroom network.** Everything so far has
-been localhost. Client isolation on managed school wifi is the one assumption
-this design rests on.
+Verified only in simulation:
+
+- The broken-drone branch of `tools/ble-doctor.py` (sparse advertising and
+  missing Parrot services). It is built from counts measured on a real
+  drone in that state, but the drone recovered before it could be re-run.
 
 ## Not built yet
 
