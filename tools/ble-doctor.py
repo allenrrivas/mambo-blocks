@@ -52,34 +52,107 @@ def bad(msg):
     print(f"  [FAIL] {msg}")
 
 
+def is_drone(dev):
+    return bool(dev.name) and any(h in dev.name.lower() for h in NAME_HINTS)
+
+
+# How often Windows reports a drone's advertisements. Measured on real
+# hardware: a healthy Mambo was heard 14 times in 15s (about once a second),
+# while one whose flight system had stopped was heard 3 times in 20s and then
+# not at all. Fewer than one every three seconds separates the two cleanly.
+SPARSE_SECONDS_PER_ADVERT = 3.0
+
+
+def sparse(count, seconds):
+    return count < seconds / SPARSE_SECONDS_PER_ADVERT
+
+
+# The advice we give when a drone is visible but its flight system is not.
+# Seen in practice: a drone advertising a few times a minute and exposing only
+# the two generic Bluetooth services, with every Parrot service gone.
+NOT_RESPONDING = """
+   The drone is switched on, but its flight system is not responding.
+   This is usually a low battery, or the drone has got stuck.
+
+     1. Charge it fully.
+     2. Hold the power button until every light goes out, wait 10 seconds,
+        then switch it back on.
+     3. Wait for the LED to blink normally, then try again.
+"""
+
+
 async def find_drone(timeout=15.0):
-    print(f"\n1. Scanning for {timeout:.0f}s ...")
-    devices = await BleakScanner.discover(timeout=timeout, return_adv=True)
-    hits = [
-        (addr, adv_pair[0], adv_pair[1])
-        for addr, adv_pair in devices.items()
-        if adv_pair[0].name and any(h in adv_pair[0].name.lower() for h in NAME_HINTS)
-    ]
-    if not hits:
-        bad(f"No Parrot device advertising ({len(devices)} other BLE devices seen).")
-        print("\n   The drone is off, out of battery, or wedged.")
+    """
+    Listen for the drone and count how often it advertises.
+
+    Returns the freshest BLEDevice seen, not just an address: connecting by
+    address makes Windows look the drone up again, and a drone that advertises
+    only every few seconds is usually not there to be found at that instant.
+    That is what produced "device not found" on a drone that was right next
+    to the laptop.
+    """
+    print(f"\n1. Listening for {timeout:.0f}s ...")
+    latest = {}
+    count = 0
+    others = set()
+
+    def on_adv(dev, adv):
+        nonlocal count
+        if is_drone(dev):
+            latest["dev"], latest["rssi"] = dev, adv.rssi
+            count += 1
+        else:
+            others.add(dev.address)
+
+    async with BleakScanner(on_adv):
+        await asyncio.sleep(timeout)
+
+    if not latest:
+        bad(f"No Parrot drone advertising ({len(others)} other Bluetooth devices seen).")
+        print("\n   The drone is off, out of battery, or stuck.")
         print("   Power-cycle it and make sure the status LED is blinking, then retry.")
-        return None
-    addr, dev, adv = hits[0]
-    ok(f"Found {dev.name} at {addr} (rssi {adv.rssi} dBm)")
-    if adv.rssi < -80:
+        return None, 0
+
+    dev = latest["dev"]
+    ok(f"Found {dev.name} at {dev.address} (rssi {latest['rssi']} dBm)")
+    if latest["rssi"] < -80:
         print("         Signal is weak — move closer.")
-    return addr
+    print(f"         Heard {count} advertisement(s) in {timeout:.0f}s.")
+    if sparse(count, timeout):
+        print("         That is very few. A healthy drone is heard about once a second,")
+        print("         so this one is probably low on battery or stuck.")
+    return dev, count
+
+
+async def refind(timeout=10.0):
+    """Wait for the next advertisement, so a retry has a fresh device to use."""
+    return await BleakScanner.find_device_by_filter(lambda d, _a: is_drone(d), timeout=timeout)
+
+
+def make_client(dev):
+    # Ask Windows for a fresh service list rather than its cached copy, so we
+    # report what the drone is exposing now and not what it exposed last time.
+    if sys.platform == "win32":
+        return BleakClient(dev, timeout=20.0, winrt={"use_cached_services": False})
+    return BleakClient(dev, timeout=20.0)
 
 
 async def main():
-    addr = await find_drone()
-    if not addr:
+    listen = 15.0
+    dev, adverts = await find_drone(listen)
+    if not dev:
         return 1
 
     print("\n2. Connecting (5 attempts, same as the app) ...")
-    client = BleakClient(addr, timeout=20.0)
+    client = None
     for attempt in range(1, 6):
+        if attempt > 1:
+            fresh = await refind()
+            if fresh is None:
+                bad(f"attempt {attempt}: drone stopped advertising, nothing to connect to")
+                continue
+            dev = fresh
+        client = make_client(dev)
         try:
             await client.connect()
             if client.is_connected:
@@ -87,21 +160,33 @@ async def main():
                 break
         except Exception as exc:  # noqa: BLE001 - report whatever the stack says
             bad(f"attempt {attempt}: {type(exc).__name__}: {exc}")
-            await asyncio.sleep(0.5 * attempt)
     else:
-        print("\n   Never connected. Something else is probably holding the drone —")
-        print("   close FreeFlight on every phone/tablet, then power-cycle the drone.")
+        print("\n   Never connected.")
+        if sparse(adverts, listen):
+            print(NOT_RESPONDING)
+        else:
+            print("   The drone is advertising normally but refusing connections, which")
+            print("   usually means something else already holds it. Close FreeFlight on")
+            print("   every phone and tablet, then power-cycle the drone.")
         return 1
 
     try:
         print("\n3. Services and characteristics ...")
         found = {}
+        parrot_services = 0
         for service in client.services:
             label = SERVICES.get(service.uuid.lower())
             if label:
                 ok(f"service {service.uuid[4:8]}  ({label})")
+                parrot_services += 1
             for ch in service.characteristics:
                 found[ch.uuid.lower()] = ch
+
+        if parrot_services == 0:
+            total = len(list(client.services))
+            bad(f"0 of 4 Parrot services present ({total} generic Bluetooth service(s) only)")
+            print(NOT_RESPONDING)
+            return 1
 
         print()
         missing = False
@@ -112,7 +197,7 @@ async def main():
                 bad(f"char {cu[4:8]}  {label}  MISSING")
                 missing = True
         if missing:
-            print("\n   Required characteristics absent — the drone needs a power cycle.")
+            print(NOT_RESPONDING)
             return 1
 
         print("\n4. Handshake (enabling notifications) ...")
