@@ -6,6 +6,8 @@
  * step, and we can highlight whichever block is currently running.
  */
 
+import { programRoots } from './workspace.js';
+
 /** Directions map onto the four PCMD stick axes. */
 const AXES = {
   forward: (s) => ({ roll: 0, pitch: s, yaw: 0, gaz: 0 }),
@@ -76,8 +78,14 @@ export class Runner {
     this.running = true;
     this.onLog('Running program...');
 
-    // Top blocks are ordered visually so the program reads top to bottom.
-    const tops = workspace.getTopBlocks(true).filter((b) => !b.isShadow());
+    // Only what hangs under "when started" flies; programs from before that
+    // block existed run every stack, top to bottom, as they always did.
+    const tops = programRoots(workspace);
+    if (!tops.length) {
+      this.onLog('Nothing is attached to "when started" — nothing to fly.');
+      this.running = false;
+      return;
+    }
 
     try {
       for (const top of tops) {

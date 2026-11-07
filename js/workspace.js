@@ -2,7 +2,9 @@
  * workspace.js — Blockly setup shared by the student and teacher views.
  */
 
-import { defineBlocks, TOOLBOX, STARTER_PROGRAM } from './blocks.js';
+import {
+  defineBlocks, TOOLBOX, STARTER_PROGRAM, START_TYPE,
+} from './blocks.js';
 
 let blocksDefined = false;
 
@@ -38,9 +40,60 @@ export function loadProgram(workspace, program) {
   Blockly.serialization.workspaces.load(program || STARTER_PROGRAM, workspace);
 }
 
+function startBlock(workspace) {
+  return workspace.getTopBlocks(false).find((b) => b.type === START_TYPE) || null;
+}
+
+/**
+ * The blocks that actually run, as the first block of each chain.
+ *
+ * With a "when started" block, that is only what hangs underneath it - loose
+ * blocks elsewhere on the canvas are ignored, as in VEXcode. Programs saved
+ * before the start block existed have none, and run every stack as they
+ * always did, so older submissions in the queue still fly.
+ *
+ * The runner, the Python preview, the "What it will do" panel and the empty
+ * check all use this, so they cannot disagree about what will fly.
+ */
+export function programRoots(workspace) {
+  const start = startBlock(workspace);
+  if (start) {
+    const first = start.getNextBlock();
+    return first ? [first] : [];
+  }
+  return workspace.getTopBlocks(true).filter((b) => !b.isShadow());
+}
+
+/** Blocks sitting on the canvas that will not run because nothing starts them. */
+export function looseStacks(workspace) {
+  if (!startBlock(workspace)) return 0;
+  return workspace.getTopBlocks(false)
+    .filter((b) => !b.isShadow() && b.type !== START_TYPE).length;
+}
+
+/**
+ * Make sure there is exactly one "when started" block, and that it cannot be
+ * thrown away. A student whose saved program predates the block gets one, with
+ * their program snapped underneath, so their work keeps flying.
+ */
+export function ensureStartBlock(workspace) {
+  let start = startBlock(workspace);
+  if (!start) {
+    const tops = workspace.getTopBlocks(true).filter((b) => !b.isShadow());
+    start = Blockly.serialization.blocks.append({ type: START_TYPE, x: 170, y: 40 }, workspace);
+    if (tops.length === 1 && tops[0].previousConnection) {
+      const xy = tops[0].getRelativeToSurfaceXY();
+      start.moveBy(xy.x - start.getRelativeToSurfaceXY().x, xy.y - 50 - start.getRelativeToSurfaceXY().y);
+      start.nextConnection.connect(tops[0].previousConnection);
+    }
+  }
+  start.setDeletable(false);
+  return start;
+}
+
 /** Does this workspace actually contain anything runnable? */
 export function isEmpty(workspace) {
-  return workspace.getTopBlocks(false).filter((b) => !b.isShadow()).length === 0;
+  return programRoots(workspace).length === 0;
 }
 
 /** Field numbers arrive as 2 or "2"; render 2 rather than 2.0, 1.5 as 1.5. */
@@ -107,7 +160,7 @@ export function toPython(workspace) {
     }
   };
 
-  workspace.getTopBlocks(true).filter((b) => !b.isShadow()).forEach((b) => walk(b, 0));
+  programRoots(workspace).forEach((b) => walk(b, 0));
   return lines.join('\n');
 }
 
@@ -153,6 +206,14 @@ export function describe(workspace) {
     }
   };
 
-  workspace.getTopBlocks(true).filter((b) => !b.isShadow()).forEach((b) => walk(b, 0));
+  programRoots(workspace).forEach((b) => walk(b, 0));
+
+  // Say so when blocks are lying loose, or a student cannot tell why part of
+  // their program never flew.
+  const loose = looseStacks(workspace);
+  if (loose) {
+    lines.push('');
+    lines.push(`(${loose} loose block${loose > 1 ? 's' : ''} not under "when started" — won't fly)`);
+  }
   return lines;
 }

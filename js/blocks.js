@@ -9,9 +9,27 @@ const HUE_FLIGHT = 200;
 const HUE_MOVE = 160;
 const HUE_TRICK = 290;
 const HUE_DANGER = 0;
+// VEXcode's Events yellow, darkened enough that white text stays readable.
+const COLOUR_EVENT = '#d89b00';
+
+/** The block every program hangs from, as in VEXcode. */
+export const START_TYPE = 'mambo_when_started';
 
 export function defineBlocks() {
+  // The rounded "hat" top marks it as the place a program begins.
+  if (!Blockly.Extensions.isRegistered('mambo_hat')) {
+    Blockly.Extensions.register('mambo_hat', function hat() { this.hat = 'cap'; });
+  }
+
   Blockly.defineBlocksWithJsonArray([
+    {
+      type: START_TYPE,
+      message0: 'when started',
+      nextStatement: null,
+      colour: COLOUR_EVENT,
+      extensions: ['mambo_hat'],
+      tooltip: 'Your program starts here. Only blocks snapped underneath will fly.',
+    },
     {
       type: 'mambo_takeoff',
       message0: 'take off',
@@ -194,15 +212,21 @@ export const STARTER_PROGRAM = {
     languageVersion: 0,
     blocks: [
       {
-        type: 'mambo_takeoff',
+        type: START_TYPE,
         x: 170,
-        y: 60,
+        y: 40,
+        deletable: false,
         next: {
           block: {
-            type: 'mambo_hover',
-            fields: { SECONDS: 2 },
+            type: 'mambo_takeoff',
             next: {
-              block: { type: 'mambo_land' },
+              block: {
+                type: 'mambo_hover',
+                fields: { SECONDS: 2 },
+                next: {
+                  block: { type: 'mambo_land' },
+                },
+              },
             },
           },
         },

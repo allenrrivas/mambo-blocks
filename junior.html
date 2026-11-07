@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Mambo Jr.</title>
+<link rel="icon" href="./favicon.ico" sizes="any">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="stylesheet" href="./css/app.css">
+<link rel="stylesheet" href="./css/junior.css">
+</head>
+<body class="junior">
+
+<!-- Pick an animal instead of typing a name. Nothing on this page is words. -->
+<div id="gate">
+  <div class="gate-card junior-gate">
+    <img src="./favicon.svg" alt="" class="gate-logo">
+    <div id="animals" class="animals"></div>
+  </div>
+</div>
+<script>
+  // Runs before Blockly finishes downloading, so a child who already picked
+  // an animal does not see a flash of the animal page on every reload.
+  try {
+    if (localStorage.getItem('mambo-junior-animal')) {
+      document.getElementById('gate').hidden = true;
+    }
+  } catch (e) { /* storage blocked: junior.js will show the animal page */ }
+</script>
+
+<div id="app" inert>
+  <header class="junior-header">
+    <span id="me" class="me" role="img"></span>
+    <button id="switch-me" class="ghost icon-button" type="button" aria-label="Someone else">🔄</button>
+    <span class="spacer"></span>
+    <span id="feedback" class="feedback" hidden></span>
+    <button id="send" class="go send-button" type="button" aria-label="Send to teacher">
+      <img alt="" width="44" height="44">
+    </button>
+  </header>
+
+  <main>
+    <div id="blockly"></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/blockly/12.3.1/blockly.min.js"></script>
+<script type="module" src="./js/junior.js"></script>
+</body>
+</html>

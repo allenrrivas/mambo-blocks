@@ -237,6 +237,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def main():
+    # The console is a Windows code page unless told otherwise, and printing a
+    # name it cannot represent (a Mambo Jr. "🦊 Fox", or any student name
+    # outside Western European letters) raised mid-request: the submission
+    # was saved but the iPad never got its reply and showed a failure.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     os.chdir(ROOT)
     load_queue()
     handler = functools.partial(Handler, directory=str(ROOT))
@@ -247,6 +256,7 @@ def main():
         ip = lan_ip()
         print(f"Mambo Blocks classroom server  (caching disabled)")
         print(f"  students -> http://{ip}:{PORT}/")
+        print(f"  junior   -> http://{ip}:{PORT}/junior.html   (picture blocks, no reading)")
         print(f"  teacher  -> http://localhost:{PORT}/teacher.html")
         if _queue:
             waiting = sum(1 for i in _queue if i["status"] == "waiting")

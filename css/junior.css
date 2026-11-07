@@ -1,0 +1,77 @@
+/* Mambo Jr. - layered on app.css. Everything is bigger, and nothing needs reading. */
+
+/* ---- animal page ---- */
+
+.junior-gate { max-width: 560px; }
+
+.animals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* Scoped under .animals so it outranks app.css's ".gate-card button", which
+   would otherwise shrink these to the reading page's button size. */
+.animals .animal {
+  font-size: 48px;
+  line-height: 1;
+  min-height: 92px;
+  padding: 0;
+  border-radius: 18px;
+  background: #f4f6fa;
+  border: 2px solid var(--line);
+  color: inherit;
+}
+.animals .animal:active { transform: scale(0.94); background: #e8ecf3; }
+
+/* ---- header ---- */
+
+.junior-header { gap: 14px; padding: 10px 16px; }
+.junior-header .spacer { flex: 1; }
+
+.me { font-size: 44px; line-height: 1; }
+
+.icon-button {
+  font-size: 26px;
+  min-height: 52px;
+  min-width: 52px;
+  padding: 0;
+}
+
+.send-button {
+  min-height: 64px;
+  min-width: 96px;
+  padding: 8px 22px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- feedback: one big picture ---- */
+
+.feedback {
+  font-size: 44px;
+  line-height: 1;
+  animation: pop 0.35s ease-out;
+}
+.feedback.busy { animation: none; opacity: 0.7; }
+
+@keyframes pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  70% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* The flag wiggles when "send" is pressed with nothing attached to it. */
+.blocklyDraggable.nudge,
+g.nudge {
+  animation: nudge 0.6s ease-in-out 2;
+}
+@keyframes nudge {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 10px #facc15) drop-shadow(0 0 4px #facc15); }
+}
+
+/* Junior has no side panel; the canvas gets the whole width. */
+.junior main { display: flex; }

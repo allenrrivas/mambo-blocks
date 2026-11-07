@@ -5,7 +5,7 @@
  */
 
 import {
-  createWorkspace, saveProgram, loadProgram, describe, isEmpty, toPython,
+  createWorkspace, saveProgram, loadProgram, describe, isEmpty, toPython, ensureStartBlock,
 } from './workspace.js';
 import { createCodeEditor, highlightBlock } from './code-editor.js';
 
@@ -189,7 +189,7 @@ els.submit.addEventListener('click', async () => {
   let program;
   if (mode === 'blocks') {
     if (isEmpty(workspace)) {
-      setStatus('Your program is empty — drag some blocks in.', 'warn');
+      setStatus('Snap your blocks under "when started" — only those will fly.', 'warn');
       return;
     }
     program = saveProgram(workspace);
@@ -238,6 +238,9 @@ function init() {
   } catch (err) {
     loadProgram(workspace, null);
   }
+  // Saved programs from before "when started" existed get one, with the
+  // student's blocks snapped underneath.
+  ensureStartBlock(workspace);
 
   editor = createCodeEditor(els.editor, {
     value: localStorage.getItem(KEYS.python) ?? STARTER_PYTHON,

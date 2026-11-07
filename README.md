@@ -98,6 +98,16 @@ get the same syntax check as student submissions. If the student sends a new
 version while you are editing, theirs replaces the entry and your changes are
 not saved - the log says so.
 
+Every block program hangs from a yellow **when started** block, as in
+VEXcode. It is already on the canvas and cannot be deleted, and **only blocks
+snapped underneath it fly** - loose blocks elsewhere are ignored, and the *What
+it will do* panel says so. The runner, the Python preview, that panel and the
+empty-program check all share one rule (`programRoots()` in `workspace.js`), so
+they cannot disagree about what will fly. A student whose saved program
+predates the block gets one added with their program snapped underneath, and
+older submissions already in the queue, which have none, still fly every stack
+as before.
+
 Students start on a **"What's your name?"** page and cannot reach the coding
 page until they give one, so every submission in the queue has a real name on
 it. The name is remembered, so a mid-lesson reload goes straight back to their
@@ -139,6 +149,32 @@ student sees is genuinely runnable in Python mode - verified by feeding
 generated output through the server's CPython syntax check. Nested repeats get
 `i`, `j`, `k` rather than shadowing, and an empty loop emits `pass` so the
 result always compiles.
+
+## Mambo Jr. (for children who cannot read yet)
+
+`http://<laptop-ip>:8777/junior.html` is a picture-only version of the student
+page. The server prints its address on startup.
+
+- **Every block is an icon**: a drone plus an arrow showing what it does. A
+  ground line tells *take off* and *land* apart from *up* and *down*; moves
+  across the floor use a drone seen from above.
+- **No words and no numbers to type.** Each block has fixed, gentle settings
+  (every move is 1 second at speed 20 - half the reading page's default - turns are 90°, wait is 2 seconds). To go
+  further, a child stacks the block again. *Repeat* counts with dots, 2 to 4.
+- **A green flag starts the program**, as in ScratchJr. Only blocks snapped
+  under it are sent, so stray blocks left lying on the canvas never fly. The
+  flag cannot be thrown away.
+- **Children pick an animal instead of typing a name.** You see "🦊 Fox" in the
+  queue; 🔄 switches to the next child on a shared iPad.
+- **Feedback is a picture**: ✅ sent, ❌ something went wrong, and 🚩 with the
+  flag wiggling when nothing is attached to it.
+- All the blocks fit in one strip along the bottom, so nothing needs scrolling
+  or reading a category name.
+
+Junior programs reach the teacher as ordinary blocks. `toStandardProgram()` in
+`js/junior-blocks.js` rewrites the picture blocks into the regular ones before
+sending, so the server, the teacher console and `runner.js` are unchanged - you
+review, edit and fly a junior program exactly like any other, as readable steps.
 
 ## Python mode
 
@@ -280,6 +316,9 @@ during moves — the same thing gobot's `StartPcmd()` does. Two reasons:
 | File | What it does |
 |---|---|
 | `index.html` / `js/student.js` | Student view — author and submit, no drone code |
+| `junior.html` / `js/junior.js` | Mambo Jr. — picture-only student view |
+| `js/junior-blocks.js` | Junior icons, blocks, and the conversion to ordinary blocks |
+| `css/junior.css` | Junior styling, layered on `app.css` |
 | `teacher.html` / `js/teacher.js` | Teacher console — queue, review, edit, fly |
 | `js/mambo-ble.js` | Web Bluetooth driver — UUIDs, handshake, packet builders |
 | `js/blocks.js` | Block definitions, toolbox, starter program |
