@@ -57,6 +57,27 @@ test failed only because the laptop was on one network and the iPads on
 another; once both were on the same one it worked immediately. Use the
 address the server prints on the day - it changes between networks.
 
+### When the school Wi-Fi will not connect them
+
+Some school networks keep the iPads off the laptop's network, or stop
+devices on the same network from reaching each other (client isolation).
+The page then never loads at all, even though the server is fine. The
+quickest way round it is to make the laptop the network:
+
+1. On the laptop: **Settings → Network & internet → Mobile hotspot**, turn it
+   on, and note the network name and password.
+2. Join the iPads to that hotspot.
+3. Restart `python tools/serve.py` so it prints the hotspot address - usually
+   `http://192.168.137.1:8777/`.
+4. Give students that address.
+
+Keep the laptop itself on the school Wi-Fi while the hotspot is on. Blockly
+and Pyodide load from a CDN, and the iPads reach it through the laptop.
+
+Windows caps the hotspot at about 8 devices, so this suits testing and small
+groups. For a full class, ask IT to put the laptop and iPads on one network
+with client isolation off, or use a classroom travel router.
+
 The teacher console needs **Chrome or Edge**. Safari and Firefox have no Web
 Bluetooth, so they cannot talk to the drone.
 
@@ -333,6 +354,8 @@ Verified against the drone:
 
 Verified without the drone:
 
+- Three iPads load the student page over the laptop's Windows Mobile Hotspot,
+  on a school network that would not connect them directly
 - All 8 packet types match pyparrot byte-for-byte, including signed values
   (turn -90 deg -> `a6 ff`, throttle -30 -> `e2`)
 - Block interpreter: sequencing, nested `repeat`, multi-flip, correct call order
