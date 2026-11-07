@@ -88,6 +88,16 @@ A submission's blocks can be panned, scrolled, wheeled and zoomed, and are
 centred when you select one. The blocks themselves stay locked, so you cannot
 detach one by accident and fly something other than what the student wrote.
 
+To change a program before flying it - drop the flip, shorten a move - click
+**Edit**. Blocks open with the full toolbox, Python in the same editor the
+students use, and *What it will do* follows your changes as you make them.
+**Save changes** stores the edit on the server and marks the entry *edited*
+in the queue; **Cancel** puts it back. Fly and Skip are off while you edit,
+so the drone only ever flies a version you have saved and read. Python edits
+get the same syntax check as student submissions. If the student sends a new
+version while you are editing, theirs replaces the entry and your changes are
+not saved - the log says so.
+
 Students start on a **"What's your name?"** page and cannot reach the coding
 page until they give one, so every submission in the queue has a real name on
 it. The name is remembered, so a mid-lesson reload goes straight back to their
@@ -270,7 +280,7 @@ during moves — the same thing gobot's `StartPcmd()` does. Two reasons:
 | File | What it does |
 |---|---|
 | `index.html` / `js/student.js` | Student view — author and submit, no drone code |
-| `teacher.html` / `js/teacher.js` | Teacher console — queue, review, fly |
+| `teacher.html` / `js/teacher.js` | Teacher console — queue, review, edit, fly |
 | `js/mambo-ble.js` | Web Bluetooth driver — UUIDs, handshake, packet builders |
 | `js/blocks.js` | Block definitions, toolbox, starter program |
 | `js/runner.js` | Walks the block tree and drives the drone |
@@ -344,6 +354,8 @@ Verified in the classroom:
 - Submissions from the iPad reach the teacher's queue
 - Block programs and Python programs both fly on the real drone
 - Connection holds across repeated runs
+- Three iPads load the student page over the laptop's Windows Mobile Hotspot,
+  on a school network that would not connect them directly
 
 Verified against the drone:
 
@@ -354,8 +366,6 @@ Verified against the drone:
 
 Verified without the drone:
 
-- Three iPads load the student page over the laptop's Windows Mobile Hotspot,
-  on a school network that would not connect them directly
 - All 8 packet types match pyparrot byte-for-byte, including signed values
   (turn -90 deg -> `a6 ff`, throttle -30 -> `e2`)
 - Block interpreter: sequencing, nested `repeat`, multi-flip, correct call order

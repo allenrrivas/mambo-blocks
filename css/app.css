@@ -109,7 +109,7 @@ button.stop {
 
 main { flex: 1; display: flex; min-height: 0; }
 
-#blockly { flex: 1; min-width: 0; }
+#blockly, #blockly-edit { flex: 1; min-width: 0; }
 
 #side {
   width: 280px;

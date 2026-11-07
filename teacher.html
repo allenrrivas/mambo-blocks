@@ -19,6 +19,9 @@
       <div class="readout">state<span id="state" class="value">--</span></div>
     </div>
     <span id="selected" class="status"></span>
+    <button id="edit" class="ghost small" disabled title="Change this program before flying it.">Edit</button>
+    <button id="save-edit" class="go small" hidden>Save changes</button>
+    <button id="cancel-edit" class="ghost small" hidden>Cancel</button>
     <button id="connect" class="ghost">Connect drone</button>
     <button id="trim" class="ghost small" disabled title="Re-level the drone. Put it on a flat surface first.">Flat trim</button>
     <button id="fly" class="go" disabled>Fly this</button>
@@ -38,6 +41,8 @@
     <div id="queue"></div>
     <div id="blockly"></div>
     <pre id="source" hidden></pre>
+    <div id="blockly-edit" hidden></div>
+    <div id="source-edit" hidden></div>
     <aside id="side">
       <h2 id="side-title">What it will do</h2>
       <pre id="steps"></pre>
@@ -45,7 +50,8 @@
       <pre id="output" hidden></pre>
       <p class="hint">
         Pick a submission, read the steps, then <strong>Fly this</strong>.
-        Programs are read-only, but you can pan and zoom to look around.
+        You can pan and zoom to look around. To change a program first,
+        click <strong>Edit</strong>, then <strong>Save changes</strong>.
       </p>
       <p class="hint">
         <button id="clear-queue" class="ghost small">Clear the queue</button>

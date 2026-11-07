@@ -6,8 +6,10 @@
 import { MamboBLE } from './mambo-ble.js';
 import { Runner } from './runner.js';
 import { PythonRunner } from './python-runner.js';
-import { createWorkspace, loadProgram, describe } from './workspace.js';
-import { highlightBlock } from './code-editor.js';
+import {
+  createWorkspace, loadProgram, saveProgram, describe, isEmpty,
+} from './workspace.js';
+import { createCodeEditor, highlightBlock } from './code-editor.js';
 
 const POLL_MS = 2000;
 
@@ -36,6 +38,11 @@ const els = {
   skip: document.getElementById('skip'),
   clearQueue: document.getElementById('clear-queue'),
   batteryWarning: document.getElementById('battery-warning'),
+  edit: document.getElementById('edit'),
+  saveEdit: document.getElementById('save-edit'),
+  cancelEdit: document.getElementById('cancel-edit'),
+  blocklyEdit: document.getElementById('blockly-edit'),
+  sourceEdit: document.getElementById('source-edit'),
 };
 
 const drone = new MamboBLE();
@@ -44,6 +51,14 @@ let runner = null;      // blocks
 let pyRunner = null;    // python
 let queue = [];
 let selectedId = null;
+
+/* Editing happens in separate panes from the review ones. The review
+   workspace is injected read-only with no toolbox, and Blockly cannot add a
+   toolbox to a workspace after the fact. It also keeps the thing that flies
+   apart from the thing being changed: only a saved edit reaches the drone. */
+let editWorkspace = null;
+let codeEditor = null;
+let editing = null;     // { id, mode, original } while the teacher is editing
 
 function anyRunning() {
   return (runner && runner.running) || (pyRunner && pyRunner.running);
@@ -64,10 +79,14 @@ function setStatus(text, cls) {
 function updateButtons() {
   const running = anyRunning();
   const lowBattery = drone.battery !== null && drone.battery < MIN_BATTERY;
-  els.fly.disabled = !(drone.connected && !!selectedId && !running && !lowBattery);
+  els.fly.disabled = !(drone.connected && !!selectedId && !running && !lowBattery && !editing);
   els.land.disabled = !drone.connected;
   els.trim.disabled = !drone.connected || running;
-  els.skip.disabled = !selectedId || running;
+  els.skip.disabled = !selectedId || running || !!editing;
+  els.edit.hidden = !!editing;
+  els.edit.disabled = !selectedId || running;
+  els.saveEdit.hidden = !editing;
+  els.cancelEdit.hidden = !editing;
 
   if (lowBattery) {
     els.batteryWarning.hidden = false;
@@ -116,8 +135,9 @@ function renderQueue() {
     const when = new Date(item.submitted_at * 1000).toLocaleTimeString();
     div.innerHTML = `<div class="who"></div><div class="meta"></div>`;
     div.querySelector('.who').textContent = item.name;
-    div.querySelector('.meta').textContent =
-      `${item.mode} · ${when}${item.status !== 'waiting' ? ` · ${item.status}` : ''}`;
+    div.querySelector('.meta').textContent = `${item.mode} · ${when}`
+      + `${item.edited ? ' · edited' : ''}`
+      + `${item.status !== 'waiting' ? ` · ${item.status}` : ''}`;
     div.addEventListener('click', () => select(item.id));
     els.queue.appendChild(div);
   });
@@ -126,6 +146,12 @@ function renderQueue() {
 function select(id) {
   const item = queue.find((q) => q.id === id);
   if (!item) return;
+  if (editing) {
+    if (id === editing.id) return;
+    if (isDirty() && !window.confirm(
+      `Throw away your changes to ${nameOf(editing.id)}'s program?`)) return;
+    closeEditor();
+  }
   selectedId = id;
   els.selected.textContent = `showing ${item.name}`;
   els.output.textContent = '';
@@ -153,6 +179,131 @@ function select(id) {
   renderQueue();
   updateButtons();
 }
+
+function nameOf(id) {
+  const item = queue.find((q) => q.id === id);
+  return item ? item.name : 'this student';
+}
+
+function editedProgram() {
+  return editing.mode === 'python' ? codeEditor.value : saveProgram(editWorkspace);
+}
+
+function isDirty() {
+  if (!editing) return false;
+  const now = editedProgram();
+  return editing.mode === 'python'
+    ? now !== editing.original
+    : JSON.stringify(now) !== editing.original;
+}
+
+function openEditor() {
+  const item = queue.find((q) => q.id === selectedId);
+  if (!item || anyRunning()) return;
+
+  if (item.mode === 'python') {
+    els.source.hidden = true;
+    els.sourceEdit.hidden = false;
+    if (!codeEditor) codeEditor = createCodeEditor(els.sourceEdit);
+    codeEditor.value = item.program;
+    editing = { id: item.id, mode: 'python', original: item.program };
+    els.steps.textContent = 'Editing. Save your changes to fly this version.';
+    codeEditor.focus();
+  } else {
+    els.blockly.hidden = true;
+    els.blocklyEdit.hidden = false;
+    // Inject only once the pane is visible; injected while hidden, Blockly
+    // measures 0 x 0 and jams everything into the top-left corner.
+    if (!editWorkspace) {
+      editWorkspace = createWorkspace('blockly-edit');
+      editWorkspace.addChangeListener(() => {
+        if (!editing || editWorkspace.isDragging()) return;
+        els.steps.textContent = describe(editWorkspace).join('\n') || '(empty program)';
+      });
+    }
+    Blockly.svgResize(editWorkspace);
+    loadProgram(editWorkspace, item.program);
+    editWorkspace.scrollCenter();
+    // Compare against Blockly's own serialisation of what it loaded, not the
+    // submitted JSON, so an untouched program never counts as changed.
+    editing = { id: item.id, mode: 'blocks', original: JSON.stringify(saveProgram(editWorkspace)) };
+    els.steps.textContent = describe(editWorkspace).join('\n') || '(empty program)';
+  }
+
+  els.sideTitle.textContent = `Editing ${item.name}'s program`;
+  log(`Editing ${item.name}'s program.`);
+  updateButtons();
+}
+
+function closeEditor() {
+  editing = null;
+  els.blocklyEdit.hidden = true;
+  els.sourceEdit.hidden = true;
+  updateButtons();
+}
+
+async function saveEdits() {
+  if (!editing) return;
+  const { id, mode } = editing;
+  const name = nameOf(id);
+  const program = editedProgram();
+
+  if (!isDirty()) {
+    closeEditor();
+    select(id);
+    return;
+  }
+  if (mode === 'python' ? !program.trim() : isEmpty(editWorkspace)) {
+    log('That would leave the program empty. Skip it instead if it should not fly.');
+    return;
+  }
+
+  els.saveEdit.disabled = true;
+  try {
+    const res = await fetch(`/api/program/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ program }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      log(`Saved your changes to ${name}'s program.`);
+      closeEditor();
+      await poll();
+      select(id);
+    } else if (data.error === 'syntax') {
+      log(`Not saved. Line ${data.line}: ${data.message}`);
+      codeEditor.selectLine(data.line);
+    } else if (res.status === 404) {
+      // A resubmission replaces the entry, so the one being edited is gone.
+      log(`Not saved: ${name} sent a new version while you were editing. `
+        + 'Their new version is in the queue.');
+      closeEditor();
+      selectedId = null;
+      await poll();
+    } else {
+      log(`Not saved: ${data.error || res.status}`);
+    }
+  } catch (err) {
+    log(`Not saved: ${err.message}`);
+  } finally {
+    els.saveEdit.disabled = false;
+  }
+}
+
+function cancelEdits() {
+  if (!editing) return;
+  const { id } = editing;
+  if (isDirty() && !window.confirm('Throw away your changes?')) return;
+  closeEditor();
+  log('Edit cancelled.');
+  select(id);
+}
+
+els.edit.addEventListener('click', openEditor);
+els.saveEdit.addEventListener('click', saveEdits);
+els.cancelEdit.addEventListener('click', cancelEdits);
 
 async function poll() {
   try {
@@ -286,6 +437,7 @@ els.clearQueue.addEventListener('click', async () => {
     + 'This cannot be undone.')) return;
   try {
     await fetch('/api/clear', { method: 'POST' });
+    closeEditor();
     selectedId = null;
     await poll();
     log('Queue cleared.');
@@ -304,6 +456,7 @@ document.addEventListener('visibilitychange', () => {
 
 window.addEventListener('resize', () => {
   if (workspace) Blockly.svgResize(workspace);
+  if (editWorkspace) Blockly.svgResize(editWorkspace);
 });
 
 workspace = createWorkspace('blockly', { toolbox: false });

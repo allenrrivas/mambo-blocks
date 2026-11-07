@@ -73,6 +73,25 @@ def lan_ip():
         s.close()
 
 
+def check_program(mode, program):
+    """Return an error body if this program cannot be accepted, else None.
+
+    We are Python, so we can check syntax with the real parser for free and
+    say so before a program ever reaches the drone. Beats finding out when the
+    teacher tries to fly it. Teacher edits go through the same check.
+    """
+    if mode == "python":
+        if not isinstance(program, str):
+            return {"error": "python program must be text"}
+        try:
+            compile(program, "<student>", "exec")
+        except SyntaxError as exc:
+            return {"error": "syntax", "line": exc.lineno, "message": exc.msg}
+    elif not isinstance(program, dict):
+        return {"error": "blocks program must be a JSON object"}
+    return None
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     # ---- helpers ----------------------------------------------------------
 
@@ -117,6 +136,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._submit()
         if self.path.startswith("/api/status/"):
             return self._set_status(self.path.rsplit("/", 1)[-1])
+        if self.path.startswith("/api/program/"):
+            return self._edit_program(self.path.rsplit("/", 1)[-1])
         if self.path == "/api/clear":
             return self._clear()
         return self._json({"error": "unknown endpoint"}, 404)
@@ -138,20 +159,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if program is None:
             return self._json({"error": "missing program"}, 400)
 
-        # We are Python, so we can check a student's syntax with the real
-        # parser for free and tell them before it ever reaches the drone.
-        # Beats finding out when the teacher tries to fly it.
-        if mode == "python":
-            if not isinstance(program, str):
-                return self._json({"error": "python program must be text"}, 400)
-            try:
-                compile(program, "<student>", "exec")
-            except SyntaxError as exc:
-                return self._json({
-                    "error": "syntax",
-                    "line": exc.lineno,
-                    "message": exc.msg,
-                }, 400)
+        problem = check_program(mode, program)
+        if problem:
+            return self._json(problem, 400)
 
         item = {
             "id": uuid.uuid4().hex[:10],
@@ -197,6 +207,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     item["status"] = status
                     rewrite_queue()
                     return self._json({"ok": True})
+        return self._json({"error": "no such submission"}, 404)
+
+    def _edit_program(self, item_id):
+        """The teacher changing a submission before flying it."""
+        data = self._read_json()
+        if not isinstance(data, dict) or data.get("program") is None:
+            return self._json({"error": "missing program"}, 400)
+        program = data["program"]
+        with _lock:
+            for item in _queue:
+                if item["id"] == item_id:
+                    problem = check_program(item["mode"], program)
+                    if problem:
+                        return self._json(problem, 400)
+                    item["program"] = program
+                    item["edited"] = True
+                    rewrite_queue()
+                    print(f"  teacher edited {item['name']}'s program")
+                    return self._json({"ok": True})
+        # Most likely the student resubmitted, which replaces the entry.
         return self._json({"error": "no such submission"}, 404)
 
     def _clear(self):
